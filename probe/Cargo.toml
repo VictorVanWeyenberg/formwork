@@ -1,0 +1,13 @@
+[package]
+name = "probe"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+typed-builder = "0.23"
+
+[features]
+# `cargo check -p probe --features typed_builder_e0220_repro` reproduces the E0220 on `Vec<M::Kind>`
+# fields marked `#[builder(via_mutators)]` (typed-builder 0.23.2).
+typed_builder_e0220_repro = []
