@@ -1,4 +1,5 @@
-use crate::blueprint::{Blueprint, Draft, Final, Mode};
+use crate::blueprint::blueprint;
+use crate::blueprint::{Draft, Final, Mode};
 use crate::effect::{Effect, SheetOperation};
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
@@ -13,7 +14,8 @@ use typed_builder::TypedBuilder;
 /// the fully qualified form does. That spelling in turn makes serde's bound inference see `M`
 /// and demand `M: Serialize + Deserialize + Default`; `#[serde(bound = "")]` switches the
 /// inference off — the `Node` bounds on the associated types are all the impls need.
-#[derive(Clone, PartialEq, Serialize, Deserialize, TypedBuilder, Blueprint)]
+#[blueprint]
+#[derive(Clone, PartialEq, Serialize, Deserialize, TypedBuilder)]
 #[serde(bound = "")]
 #[builder(mutators(
     /// Final: `Effect`. Draft: `Effect` (fixed) or `Choice<Effect>` (pending).

@@ -2,11 +2,12 @@
 //! *nested* choice (Ability Score Improvement: "+2 to one, or +1 to two"), and a struct with two
 //! slot fields for the derive.
 
-use crate::blueprint::{Blueprint, Cardinality, Choice, ChoiceOption, Draft, Mode};
+use crate::blueprint::{Cardinality, Choice, ChoiceOption, Draft, Mode};
 use crate::effect::*;
 use crate::race::Race;
 use crate::traits::Trait;
 use serde::{Deserialize, Serialize};
+use spike_derive::blueprint;
 
 fn style(title: &str, description: &str) -> Trait {
     Trait::builder().title(title).description(description).build()
@@ -73,7 +74,8 @@ pub fn fighter() -> Race<Draft> {
 /// Two slot fields of different kinds; the derive must visit them in declaration order.
 /// Shorthand `M::Kind` spelling (no builder here), so both derive detection paths are covered,
 /// and deliberately *without* `#[serde(bound = "")]`: with the shorthand, serde infers no bound on `M`.
-#[derive(Clone, PartialEq, Serialize, Deserialize, Blueprint)]
+#[blueprint]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Both<M: Mode> {
     pub label: String,
     pub effects: Vec<M::Effect>,

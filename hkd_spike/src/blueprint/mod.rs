@@ -12,7 +12,7 @@ pub use slot::*;
 
 /// `#[derive(Blueprint)]` for `struct X<M: Mode> { .., slots: Vec<M::Kind>, .. }` (see `spike_derive`).
 /// Same name as the trait below, different namespace — exactly like `serde::Serialize`.
-pub use spike_derive::Blueprint;
+pub use spike_derive::blueprint;
 
 /// Implemented (derived) for every `X<Draft>`.
 pub trait Blueprint: Sized {

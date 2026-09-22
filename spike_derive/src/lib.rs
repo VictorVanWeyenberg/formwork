@@ -18,8 +18,8 @@ use syn::{
     PathArguments, Type,
 };
 
-#[proc_macro_derive(Blueprint)]
-pub fn derive_blueprint(input: TokenStream) -> TokenStream {
+#[proc_macro_attribute]
+pub fn blueprint(_attr: TokenStream, input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     expand(input)
         .unwrap_or_else(Error::into_compile_error)
@@ -56,6 +56,8 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 
     let bp = quote!(crate::blueprint);
     Ok(quote! {
+        #input
+        
         #[automatically_derived]
         impl #bp::Blueprint for #name<#bp::Draft> {
             type Final = #name<#bp::Final>;

@@ -1,9 +1,11 @@
-use crate::blueprint::{Blueprint, Draft, Final, Mode};
+use crate::blueprint::{Draft, Final, Mode};
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
+use spike_derive::blueprint;
 
 /// ONE definition. `Race` means `Race<Final>`; `Race<Draft>` replaces the `RaceBlueprint` struct.
-#[derive(Clone, PartialEq, Serialize, Deserialize, TypedBuilder, Blueprint)]
+#[blueprint]
+#[derive(Clone, PartialEq, Serialize, Deserialize, TypedBuilder)]
 #[serde(bound = "")]
 #[builder(mutators(
     /// Final: `Trait`. Draft: `Trait` (lifted), `Trait<Draft>` (fixed, may hold choices) or
