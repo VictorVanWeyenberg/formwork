@@ -12,7 +12,7 @@
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenTree;
-use quote::{quote, ToTokens};
+use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse_macro_input, Data, DeriveInput, Error, Fields, GenericArgument, GenericParam, Ident,
     PathArguments, Type,
@@ -28,6 +28,11 @@ pub fn blueprint(_attr: TokenStream, input: TokenStream) -> TokenStream {
 
 fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let name = &input.ident;
+    let mode_name = format_ident!("{}Mode", name);
+    let draft_name = format_ident!("{}Draft", name);
+    let final_name = format_ident!("{}Final", name);
+    let blueprint_name = format_ident!("{}Blueprint", name);
+    let vis = &input.vis;
     let mode = mode_param(&input)?;
 
     let fields = match &input.data {
@@ -57,7 +62,14 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let bp = quote!(crate::blueprint);
     Ok(quote! {
         #input
-        
+
+        #vis trait #mode_name {}
+        #vis struct #draft_name {}
+        #vis struct #final_name {}
+        impl #mode_name for #draft_name {}
+        impl #mode_name for #final_name {}
+        // #vis type #blueprint_name = #name<#draft_name>;
+
         #[automatically_derived]
         impl #bp::Blueprint for #name<#bp::Draft> {
             type Final = #name<#bp::Final>;
