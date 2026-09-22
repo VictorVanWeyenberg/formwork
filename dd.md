@@ -64,7 +64,7 @@ struct `M`. That parameter must implement the respective `Mode` trait and define
 struct Race {
     #[slot]
     increase: AbilityScoreIncrease,
-    #[slots(trans)]
+    #[slots(transitive)]
     traits: Vec<Trait>,
 }
 ```
@@ -101,7 +101,7 @@ struct RaceDraft;
 struct RaceFinal;
 impl RaceMode for RaceDraft {
     type Increase = Slot<AbilityScoreIncrease>;
-    type Traits = Slot<TraitDraft>;
+    type Traits = Slot<Trait<TraitDraft>>;
 }
 impl RaceMode for RaceFinal {
     type Increase = AbilityScoreIncrease;
@@ -115,15 +115,26 @@ a type that also has a mode. The `slot`/`slots` attribute should trigger generat
 trait and its implementors. The name of the associated type is the PascalCase of the field name.
 
 In the `Final` implementor, the type is the original type from the input struct. The `trans` predicate field means that
-the field type is a `Blueprint` as well on its turn. If `trans` is present for field type `Field`, the type is
-`Slot<FieldDraft>`. The macro will assume ident `Field` + `Draft` exists. If `trans` is not present for field type
+the field type is a `Blueprint` as well on its turn. If `trans`is present for field type`Field`, the type is
+`Slot<Field<FieldDraft>>`. The macro will assume ident `Field`+`Draft`exists. If`trans`is not present for field type
 `Field`, the type is `Slot<Field>`.
 
-    4a. First do slot associated type generation and implementation.
-    4b. Then do slots associated type generation and implementation.
-    4c. Then do slot + trans associated type generation and implementation.
-    4d. Then do slots + trans associated type generation and implementation.
-    4e. Lastly change the fields in the input struct.
+| Attribute  | slot     | ~              | slots               | ~              | slot(transitive)  | ~                   | slots(transitive)   | ~                       |
+|------------|----------|----------------|---------------------|----------------|-------------------|---------------------|---------------------|-------------------------|
+| Field type | A        | Vec\<A>        | A                   | Vec\<A>        | A                 | Vec\<A>             | A                   | Vec\<A>                 |
+| Draft      | Slot\<A> | Slot\<Vec\<A>> | Invalid<sup>1</sup> | Vec\<Slot\<A>> | Slot\<A\<ADraft>> | Invalid<sup>2</sup> | Invalid<sup>1</sup> | Vec\<Slot\<A\<ADraft>>> |
+| Final      | A        | Vec\<A>        | Invalid<sup>1</sup> | Vec\<A>        | A                 | Invalid<sup>2</sup> | Invalid<sup>1</sup> | Vec\<A>                 |
+
+**Invalid<sup>1</sup>**: The attribute `slots` is meant for collections.
+
+**Invalid<sup>2</sup>**: A generic object cannot transitively be a blueprint. If this is a collection, you may want to
+use the `slots(transitive)` attribute.
+
+**Atomic Increments**
+
+4a. First do slot associated type generation and implementation. 4b. Then do slots associated type generation and
+implementation. 4c. Then do slot + trans associated type generation and implementation. 4d. Then do slots + trans
+associated type generation and implementation. 4e. Lastly change the fields in the input struct.
 
 5. Clean up code.
 
@@ -138,8 +149,5 @@ the field type is a `Blueprint` as well on its turn. If `trans` is present for f
 
 # Next issue
 
-Choice Prompt trait prevents from presenting the choices in a typed fashion.
-Choice is still generic which prevents th whole tree from being flattened into one collection of choices.
-
-
-
+Choice Prompt trait prevents from presenting the choices in a typed fashion. Choice is still generic which prevents th
+whole tree from being flattened into one collection of choices.
