@@ -1,10 +1,10 @@
 //! The Dwarf, written the way a book author (`fifth_srd`) would write it. Helpers keep returning
 //! plain `Trait`; only the one trait with a choice is a `Trait<Draft>`.
 
-use crate::blueprint::{Choice, ChoiceOption, Draft};
+use crate::blueprint::{Choice, ChoiceOption};
 use crate::effect::*;
 use crate::race::{Race, RaceBlueprint};
-use crate::traits::Trait;
+use crate::traits::{Trait, TraitDraft};
 
 pub fn ability_score_increase_trait(increase: isize, ability: Ability) -> Trait {
     Trait::builder()
@@ -77,7 +77,7 @@ pub fn tool_proficiency_effect(tool: &str) -> Effect {
 
 /// The only Dwarf trait that needs a choice: a `Choice<Effect>` sits where the effect will be.
 /// `Trait::builder()` infers `M = Draft` from the return type (no turbofish needed).
-pub fn tool_proficiency() -> Trait<Draft> {
+pub fn tool_proficiency() -> Trait<TraitDraft> {
     Trait::builder()
         .title("Tool Proficiency")
         .description("You gain proficiency with the artisan's tools of your choice: smith's tools, brewer's supplies, or mason's tools.")

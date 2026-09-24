@@ -2,19 +2,19 @@
 //! *nested* choice (Ability Score Improvement: "+2 to one, or +1 to two"), and a struct with two
 //! slot fields for the derive.
 
-use crate::blueprint::{Cardinality, Choice, ChoiceOption, Draft, Mode};
+use crate::blueprint::{Cardinality, Choice, ChoiceOption};
 use crate::effect::*;
-use crate::race::Race;
-use crate::traits::Trait;
+use crate::race::{Race, RaceDraft};
+use crate::traits::{Trait, TraitDraft};
 use serde::{Deserialize, Serialize};
 use spike_derive::blueprint;
 
 fn style(title: &str, description: &str) -> Trait {
-    Trait::builder().title(title).description(description).build()
+    Trait::new(title.to_string(), description.to_string(), vec![])
 }
 
 /// Each option is a finished `Trait`, lifted into the draft by `ChoiceOption::single`'s `Into`.
-pub fn fighting_style() -> Choice<Trait<Draft>> {
+pub fn fighting_style() -> Choice<Trait<TraitDraft>> {
     Choice::one(
         "Choose a fighting style.",
         [
@@ -36,13 +36,13 @@ fn asi_options(increase: isize) -> impl Iterator<Item = ChoiceOption<Effect>> {
 }
 
 /// A choice whose options themselves contain choices.
-pub fn ability_score_improvement() -> Choice<Trait<Draft>> {
-    let plus_two = Trait::<Draft>::builder()
+pub fn ability_score_improvement() -> Choice<Trait<TraitDraft>> {
+    let plus_two = Trait::<TraitDraft>::builder()
         .title("Ability Score Improvement")
         .description("Increase one ability score by 2.")
         .with_effect(Choice::one("Choose the ability to increase by 2.", asi_options(2)))
         .build();
-    let plus_one_twice = Trait::<Draft>::builder()
+    let plus_one_twice = Trait::<TraitDraft>::builder()
         .title("Ability Score Improvement")
         .description("Increase two ability scores by 1.")
         .with_effect(Choice::new(
@@ -61,7 +61,7 @@ pub fn ability_score_improvement() -> Choice<Trait<Draft>> {
 }
 
 /// Not a race, but the spike has no `Class`: the two class-level shapes hung on a `Race<Draft>`.
-pub fn fighter() -> Race<Draft> {
+pub fn fighter() -> Race<RaceDraft> {
     Race::builder()
         .id("spike/race/fighter")
         .name("Fighter")
@@ -76,8 +76,8 @@ pub fn fighter() -> Race<Draft> {
 /// and deliberately *without* `#[serde(bound = "")]`: with the shorthand, serde infers no bound on `M`.
 #[blueprint]
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub struct Both<M: Mode> {
+pub struct Both {
     pub label: String,
-    pub effects: Vec<M::Effect>,
-    pub traits: Vec<M::Trait>,
+    pub effects: Vec<Effect>,
+    pub traits: Vec<Trait>,
 }

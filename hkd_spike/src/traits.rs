@@ -1,5 +1,4 @@
 use crate::blueprint::blueprint;
-use crate::blueprint::{Draft, Final, Mode};
 use crate::effect::{Effect, SheetOperation};
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
@@ -15,28 +14,19 @@ use typed_builder::TypedBuilder;
 /// and demand `M: Serialize + Deserialize + Default`; `#[serde(bound = "")]` switches the
 /// inference off — the `Node` bounds on the associated types are all the impls need.
 #[blueprint]
-#[derive(Clone, PartialEq, Serialize, Deserialize, TypedBuilder)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(bound = "")]
-#[builder(mutators(
-    /// Final: `Effect`. Draft: `Effect` (fixed) or `Choice<Effect>` (pending).
-    pub fn with_effect(&mut self, effect: impl Into<<M as Mode>::Effect>) {
-        self.effects.push(effect.into())
-    }
-    pub fn with_permanent_effect(&mut self, operation: SheetOperation) {
-        self.effects.push(Effect::new(operation).into())
-    }
-))]
-pub struct Trait<M: Mode = Final> {
-    #[builder(setter(into))]
+pub struct Trait {
     title: String,
-    #[builder(setter(into))]
     description: String,
-    #[builder(default, via_mutators)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    effects: Vec<<M as Mode>::Effect>,
+    effects: Vec<Effect>,
 }
 
-impl<M: Mode> Trait<M> {
+impl Trait {
+    pub fn new(title: String, description: String, effects: Vec<Effect>) -> Self {
+        Self { title, description, effects, phantom: Default::default() }
+    }
     pub fn title(&self) -> &str {
         &self.title
     }
@@ -45,14 +35,11 @@ impl<M: Mode> Trait<M> {
         &self.description
     }
 
-    pub fn effects(&self) -> &[M::Effect] {
+    pub fn effects(&self) -> &[Effect] {
         &self.effects
     }
 
-    pub fn add_effect(&mut self, effect: impl Into<M::Effect>) {
+    pub fn add_effect(&mut self, effect: impl Into<Effect>) {
         self.effects.push(effect.into());
     }
 }
-
-/// Domain vocabulary preserved: a blueprint is just the draft mode.
-pub type TraitBlueprint = Trait<Draft>;

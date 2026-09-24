@@ -10,13 +10,44 @@
 //! crate that defines the blueprint machinery (a `#[blueprint(crate = "...")]` attribute would
 //! lift that restriction later).
 
+use crate::alter_input::generate_struct;
+use crate::assoc::generate_field_trait_assoc_types;
+use crate::draft_assoc::generate_field_draft_assoc_types;
+use crate::final_assoc::generate_field_final_assoc_types;
+use crate::blueprint_impl::generate_blueprint_impl;
+use crate::slot::{SlotField, SlotKind};
+use darling::{FromDeriveInput, FromField};
+use itertools::Itertools;
 use proc_macro::TokenStream;
 use proc_macro2::TokenTree;
 use quote::{format_ident, quote, ToTokens};
+use std::ops::Not;
 use syn::{
-    parse_macro_input, Data, DeriveInput, Error, Fields, GenericArgument, GenericParam, Ident,
-    PathArguments, Type,
+    parse_macro_input, AngleBracketedGenericArguments, Attribute, Data, DataStruct, DeriveInput,
+    Error, Field, Fields, FieldsNamed, GenericArgument, GenericParam, Generics, Ident, Meta,
+    PathArguments, PathSegment, Type, TypePath, Visibility,
 };
+
+mod alter_input;
+mod assoc;
+mod blueprint_impl;
+mod draft_assoc;
+mod final_assoc;
+mod slot;
+
+struct AlteredInput {
+    tokens: proc_macro2::TokenStream,
+    plain: Vec<Ident>,
+    slots: Vec<Ident>,
+}
+
+struct BlueprintStruct {
+    attrs: Vec<Attribute>,
+    vis: Visibility,
+    ident: Ident,
+    generics: Generics,
+    fields: Vec<SlotField>,
+}
 
 #[proc_macro_attribute]
 pub fn blueprint(_attr: TokenStream, input: TokenStream) -> TokenStream {
@@ -27,155 +58,118 @@ pub fn blueprint(_attr: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let name = &input.ident;
-    let mode_name = format_ident!("{}Mode", name);
-    let draft_name = format_ident!("{}Draft", name);
-    let final_name = format_ident!("{}Final", name);
-    let blueprint_name = format_ident!("{}Blueprint", name);
     let vis = &input.vis;
-    let mode = mode_param(&input)?;
+    let attrs = &input.attrs;
+    let name = &input.ident;
+    let fields = verify_input(&input)?;
+    let draft_name = format_draft_name(name);
+    let final_name = format_final_name(name);
 
-    let fields = match &input.data {
-        Data::Struct(data) => match &data.fields {
-            Fields::Named(named) => &named.named,
-            _ => return Err(Error::new_spanned(name, "#[derive(Blueprint)] requires named fields")),
-        },
-        _ => return Err(Error::new_spanned(name, "#[derive(Blueprint)] only supports structs")),
-    };
+    let altered_input = generate_struct(attrs, vis, name, &fields);
+    let mode_tokens = generate_mode_tokens(vis, name, &fields)?;
+    let blueprint_impl = generate_blueprint_impl(name, &fields);
 
-    let mut plain = Vec::new();
-    let mut slots = Vec::new();
-    for field in fields {
-        let ident = field.ident.as_ref().expect("named field");
-        if is_slot(&field.ty, mode) {
-            slots.push(ident);
-        } else if mentions(&field.ty, mode) {
-            return Err(Error::new_spanned(
-                &field.ty,
-                format!("unsupported slot shape: expected `Vec<{mode}::Kind>`"),
-            ));
-        } else {
-            plain.push(ident);
-        }
-    }
-
-    let bp = quote!(crate::blueprint);
     Ok(quote! {
-        #input
-
-        #vis trait #mode_name {}
-        #vis struct #draft_name {}
-        #vis struct #final_name {}
-        impl #mode_name for #draft_name {}
-        impl #mode_name for #final_name {}
-        // #vis type #blueprint_name = #name<#draft_name>;
-
-        #[automatically_derived]
-        impl #bp::Blueprint for #name<#bp::Draft> {
-            type Final = #name<#bp::Final>;
-
-            fn resolve(self) -> ::core::result::Result<Self::Final, #bp::ChoiceError> {
-                let #name { #(#plain,)* #(#slots,)* } = self;
-                ::core::result::Result::Ok(#name {
-                    #(#plain,)*
-                    #(#slots: #bp::resolve_slots(#slots)?,)*
-                })
-            }
-
-            fn visible_choices(&self) -> ::std::vec::Vec<&dyn #bp::ChoicePrompt> {
-                let mut out: ::std::vec::Vec<&dyn #bp::ChoicePrompt> = ::std::vec::Vec::new();
-                #( out.extend(self.#slots.iter().flat_map(#bp::Slot::visible_choices)); )*
-                out
-            }
-
-            fn next_open_choice_mut(&mut self) -> ::core::option::Option<&mut dyn #bp::ChoicePrompt> {
-                #(
-                    if let ::core::option::Option::Some(choice) =
-                        self.#slots.iter_mut().find_map(#bp::Slot::next_open_choice_mut)
-                    {
-                        return ::core::option::Option::Some(choice);
-                    }
-                )*
-                ::core::option::Option::None
-            }
-        }
-
-        #[automatically_derived]
-        impl ::core::convert::From<#name<#bp::Final>> for #name<#bp::Draft> {
-            fn from(value: #name<#bp::Final>) -> Self {
-                let #name { #(#plain,)* #(#slots,)* } = value;
-                #name {
-                    #(#plain,)*
-                    #(#slots: #slots.into_iter().map(::core::convert::Into::into).collect(),)*
-                }
-            }
-        }
-
-        #[automatically_derived]
-        impl ::core::convert::From<#name<#bp::Final>> for #bp::Slot<#name<#bp::Draft>> {
-            fn from(value: #name<#bp::Final>) -> Self {
-                #bp::Slot::Fixed(::core::convert::Into::into(value))
-            }
-        }
+        #altered_input
+        #mode_tokens
+        #blueprint_impl
     })
 }
 
-/// The single type parameter of the struct: its mode.
-fn mode_param(input: &DeriveInput) -> syn::Result<&Ident> {
-    let generics = &input.generics;
-    let mut types = generics.params.iter().filter_map(|param| match param {
-        GenericParam::Type(ty) => Some(&ty.ident),
-        _ => None,
-    });
-    let mode = types.next();
-    let others = generics.params.iter().any(|p| !matches!(p, GenericParam::Type(_)));
-    match (mode, types.next(), others) {
-        (Some(mode), None, false) => Ok(mode),
-        _ => Err(Error::new_spanned(
-            generics,
-            "#[derive(Blueprint)] expects exactly one generic parameter: the mode `M: Mode`",
-        )),
-    }
+fn generate_mode_tokens(
+    vis: &Visibility,
+    name: &Ident,
+    fields: &Vec<SlotField>,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let mode_name = format_mode_name(&name);
+    let draft_name = format_draft_name(&name);
+    let final_name = format_final_name(&name);
+    let blueprint_name = format_blueprint_name(&name);
+    let draft_assoc_types = generate_field_draft_assoc_types(fields);
+    let final_assoc_types = generate_field_final_assoc_types(fields);
+    let trait_assoc_types = generate_field_trait_assoc_types(fields);
+    Ok(quote! {
+        #vis trait #mode_name {
+            #(#trait_assoc_types
+            )*
+        }
+        #vis struct #draft_name;
+        #vis struct #final_name;
+        impl #mode_name for #draft_name {
+            #(#draft_assoc_types
+            )*
+        }
+        impl #mode_name for #final_name {
+            #(#final_assoc_types
+            )*
+        }
+        #vis type #blueprint_name = #name<#draft_name>;
+    })
 }
 
-/// `Vec<M::Kind>` or `Vec<<M as Trait>::Kind>` and nothing else.
-fn is_slot(ty: &Type, mode: &Ident) -> bool {
-    let Type::Path(outer) = ty else { return false };
-    if outer.qself.is_some() || outer.path.segments.len() != 1 {
-        return false;
+fn format_blueprint_name(name: &Ident) -> Ident {
+    format_ident!("{}Blueprint", name)
+}
+
+fn format_final_name(name: &Ident) -> Ident {
+    format_ident!("{}Final", name)
+}
+
+fn format_draft_name(name: &Ident) -> Ident {
+    format_ident!("{}Draft", name)
+}
+
+fn format_mode_name(name: &Ident) -> Ident {
+    format_ident!("{}Mode", name)
+}
+
+fn verify_input(input: &DeriveInput) -> syn::Result<Vec<SlotField>> {
+    if !input.generics.params.is_empty() {
+        return Err(Error::new_spanned(
+            &input.generics,
+            "Attribute `blueprint` does not support generic parameters",
+        ));
     }
-    let vec = &outer.path.segments[0];
-    if vec.ident != "Vec" {
-        return false;
-    }
-    let PathArguments::AngleBracketed(args) = &vec.arguments else { return false };
-    if args.args.len() != 1 {
-        return false;
-    }
-    let Some(GenericArgument::Type(Type::Path(inner))) = args.args.first() else { return false };
-    if !inner.path.segments.iter().all(|s| s.arguments.is_none()) {
-        return false;
-    }
-    match &inner.qself {
-        // `M::Kind`
-        None => inner.path.segments.len() == 2 && inner.path.segments[0].ident == *mode,
-        // `<M as Mode>::Kind`
-        Some(qself) => {
-            let Type::Path(self_ty) = &*qself.ty else { return false };
-            self_ty.qself.is_none()
-                && self_ty.path.is_ident(mode)
-                && qself.position + 1 == inner.path.segments.len()
+    match &input.data {
+        Data::Struct(data) => match &data.fields {
+            Fields::Named(FieldsNamed { named, .. }) => named
+                .iter()
+                .cloned()
+                .map(|field| field.try_into())
+                .collect::<syn::Result<Vec<_>>>(),
+            _ => {
+                return Err(Error::new_spanned(
+                    &input.ident,
+                    "#[derive(Blueprint)] requires named fields",
+                ))
+            }
+        },
+        _ => {
+            return Err(Error::new_spanned(
+                &input.ident,
+                "#[derive(Blueprint)] only supports structs",
+            ))
         }
     }
 }
 
-fn mentions(ty: &Type, mode: &Ident) -> bool {
-    fn walk(stream: proc_macro2::TokenStream, mode: &Ident) -> bool {
-        stream.into_iter().any(|tree| match tree {
-            TokenTree::Ident(ident) => ident == *mode,
-            TokenTree::Group(group) => walk(group.stream(), mode),
-            _ => false,
-        })
-    }
-    walk(ty.to_token_stream(), mode)
+fn generate_assoc_type_name(field: &Field) -> proc_macro2::TokenStream {
+    let name = format_ident!(
+        "{}",
+        convert_case::ccase!(pascal, &field.ident.clone().unwrap().to_string())
+    );
+    quote! { #name }
+}
+
+fn generate_field_assoc_type_lvalue(field: &Field) -> proc_macro2::TokenStream {
+    let name = generate_assoc_type_name(field);
+    quote! { type #name }
+}
+
+fn generate_field_assoc_type_assignment(
+    field: &Field,
+    assign_to: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    let lvalue = generate_field_assoc_type_lvalue(field);
+    quote! { #lvalue = #assign_to; }
 }
