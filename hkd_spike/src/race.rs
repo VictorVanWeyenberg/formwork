@@ -1,17 +1,18 @@
-use serde::{Deserialize, Serialize};
-use typed_builder::TypedBuilder;
-use spike_derive::blueprint;
+use crate::traits::TraitDraft;
 use crate::traits::Trait;
+use serde::{Deserialize, Serialize};
+use spike_derive::blueprint;
 
 /// ONE definition. `Race` means `Race<Final>`; `Race<Draft>` replaces the `RaceBlueprint` struct.
-#[blueprint]
-#[derive(Clone, PartialEq, Serialize, Deserialize, TypedBuilder)]
+#[blueprint(derive(Clone, PartialEq))]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct Race {
     /// `String` stands in for `RaceRef`.
     id: String,
     name: String,
     description: String,
+    #[slots_transitive]
     traits: Vec<Trait>,
 }
 

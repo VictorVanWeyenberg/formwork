@@ -1,4 +1,4 @@
-use crate::blueprint::Slot;
+use crate::blueprint::SlotOne;
 use crate::effect::Effect;
 use crate::traits::Trait;
 use serde::de::DeserializeOwned;

@@ -5,57 +5,78 @@ use quote::{quote, ToTokens};
 use syn::{GenericArgument, Type};
 
 pub fn generate_field_draft_assoc_types(fields: &Vec<SlotField>) -> Vec<proc_macro2::TokenStream> {
-    fields.iter().map(generate_field_draft_assoc_type).collect()
+    fields
+        .iter()
+        .filter_map(generate_field_draft_assoc_type)
+        .collect()
 }
 
-fn generate_field_draft_assoc_type(slot_field: &SlotField) -> proc_macro2::TokenStream {
+fn generate_field_draft_assoc_type(slot_field: &SlotField) -> Option<proc_macro2::TokenStream> {
     match &slot_field.slot_kind {
-        None => slot_field.field.clone().into_token_stream(),
+        None => None,
         Some(slot_kind) => match slot_kind {
-            SlotKind::Slot { ty } => generate_field_assoc_type_assignment(
+            SlotKind::Slot { ty, many } => Some(generate_field_assoc_type_assignment(
                 &slot_field.field,
-                generate_slot_field_draft_assoc_type(ty),
-            ),
+                generate_slot_field_draft_assoc_type(ty, many),
+            )),
             SlotKind::SlotTransitive {
                 generic_type_name,
                 draft_name,
-            } => generate_field_assoc_type_assignment(
+                many,
+            } => Some(generate_field_assoc_type_assignment(
                 &slot_field.field,
-                generate_slot_transitive_field_draft_assoc_type(generic_type_name, draft_name),
-            ),
-            SlotKind::Slots { generic_argument } => generate_field_assoc_type_assignment(
+                generate_slot_transitive_field_draft_assoc_type(
+                    generic_type_name,
+                    draft_name,
+                    many,
+                ),
+            )),
+            SlotKind::Slots { generic_argument } => Some(generate_field_assoc_type_assignment(
                 &slot_field.field,
                 generate_slots_field_draft_assoc_type(generic_argument),
-            ),
+            )),
             SlotKind::SlotsTransitive {
                 generic_type_name,
                 draft_name,
-            } => generate_field_assoc_type_assignment(
+            } => Some(generate_field_assoc_type_assignment(
                 &slot_field.field,
                 generate_slots_transitive_draft_assoc_type(generic_type_name, draft_name),
-            ),
+            )),
         },
     }
 }
 
-fn generate_slot_field_draft_assoc_type(ty: &Type) -> proc_macro2::TokenStream {
-    quote! {
-        crate::blueprint::Slot<#ty>,
+fn generate_slot_field_draft_assoc_type(ty: &Type, many: &bool) -> proc_macro2::TokenStream {
+    if *many {
+        quote! {
+            crate::blueprint::SlotMany<#ty>
+        }
+    } else {
+        quote! {
+            crate::blueprint::SlotOne<#ty>
+        }
     }
 }
 
 fn generate_slots_field_draft_assoc_type(arg: &GenericArgument) -> proc_macro2::TokenStream {
     quote! {
-        Vec<crate::blueprint::Slot<#arg>>,
+        crate::blueprint::SlotOne<#arg>
     }
 }
 
 fn generate_slot_transitive_field_draft_assoc_type(
     name: &Ident,
     draft_name: &Ident,
+    many: &bool,
 ) -> proc_macro2::TokenStream {
-    quote! {
-        crate::blueprint::Slot<#name<#draft_name>>,
+    if *many {
+        quote! {
+            crate::blueprint::SlotMany<#name<#draft_name>>
+        }
+    } else {
+        quote! {
+            crate::blueprint::SlotOne<#name<#draft_name>>
+        }
     }
 }
 
@@ -64,6 +85,6 @@ fn generate_slots_transitive_draft_assoc_type(
     draft_name: &Ident,
 ) -> proc_macro2::TokenStream {
     quote! {
-        Vec<crate::blueprint::Slot<#name<#draft_name>>>,
+        crate::blueprint::SlotOne<#name<#draft_name>>
     }
 }

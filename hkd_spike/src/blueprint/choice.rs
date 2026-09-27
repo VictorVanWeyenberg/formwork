@@ -38,6 +38,12 @@ impl Cardinality {
     }
 }
 
+impl Default for Cardinality {
+    fn default() -> Self {
+        Cardinality::ONE
+    }
+}
+
 fn non_zero(n: usize) -> NonZeroUsize {
     NonZeroUsize::new(n).expect("a cardinality of zero makes no sense")
 }
@@ -118,6 +124,7 @@ impl<T> ChoiceOption<T> {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Choice<T> {
     #[serde(rename = "choose")]
+    #[serde(skip_serializing_if = "is_default")]
     cardinality: Cardinality,
     prompt: String,
     #[serde(
@@ -132,18 +139,11 @@ pub struct Choice<T> {
 impl<T> Choice<T> {
     /// Panics on duplicate labels: an authoring-time error, like the `unwrap()`s on content refs.
     pub fn new(
-        prompt: impl Into<String>,
         cardinality: Cardinality,
+        prompt: impl Into<String>,
         options: impl IntoIterator<Item = ChoiceOption<T>>,
     ) -> Self {
         let options: Vec<ChoiceOption<T>> = options.into_iter().collect();
-        for (i, option) in options.iter().enumerate() {
-            assert!(
-                !options[..i].iter().any(|o| o.label == option.label),
-                "duplicate option label `{}`",
-                option.label
-            );
-        }
         Self {
             cardinality,
             prompt: prompt.into(),
@@ -153,15 +153,11 @@ impl<T> Choice<T> {
     }
 
     pub fn one(prompt: impl Into<String>, options: impl IntoIterator<Item = ChoiceOption<T>>) -> Self {
-        Self::new(prompt, Cardinality::ONE, options)
+        Self::new(Cardinality::ONE, prompt, options)
     }
 
     pub fn prompt(&self) -> &str {
         &self.prompt
-    }
-
-    pub fn cardinality(&self) -> &Cardinality {
-        &self.cardinality
     }
 
     pub fn options(&self) -> &[ChoiceOption<T>] {
@@ -211,7 +207,23 @@ impl<T> Choice<T> {
     }
 
     /// Consume the choice, yielding the picked values (flattened).
-    pub fn make(self) -> Result<Vec<T>, ChoiceError> {
+    pub fn make_one(self) -> Result<T, ChoiceError> {
+        let Self { cardinality, prompt, options, selected } = self;
+        if let Some(label) = selected.iter().find(|label| !options.iter().any(|o| &o.label == *label)) {
+            return Err(ChoiceError::UnknownOption { prompt, label: label.clone() });
+        }
+        if !cardinality.accepts(selected.len()) {
+            return Err(ChoiceError::BadCardinality { prompt, expected: cardinality, got: selected.len() });
+        }
+        Ok(options
+            .into_iter()
+            .filter(|o| selected.contains(&o.label))
+            .flat_map(|o| o.values)
+            .next()
+            .unwrap())
+    }
+
+    pub fn make_many(self) -> Result<Vec<T>, ChoiceError> {
         let Self { cardinality, prompt, options, selected } = self;
         if let Some(label) = selected.iter().find(|label| !options.iter().any(|o| &o.label == *label)) {
             return Err(ChoiceError::UnknownOption { prompt, label: label.clone() });

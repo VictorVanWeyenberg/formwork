@@ -13,19 +13,20 @@ use typed_builder::TypedBuilder;
 /// the fully qualified form does. That spelling in turn makes serde's bound inference see `M`
 /// and demand `M: Serialize + Deserialize + Default`; `#[serde(bound = "")]` switches the
 /// inference off — the `Node` bounds on the associated types are all the impls need.
-#[blueprint]
+#[blueprint(derive(Clone, PartialEq))]
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct Trait {
     title: String,
     description: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[slots]
     effects: Vec<Effect>,
 }
 
 impl Trait {
     pub fn new(title: String, description: String, effects: Vec<Effect>) -> Self {
-        Self { title, description, effects, phantom: Default::default() }
+        Self { title, description, effects }
     }
     pub fn title(&self) -> &str {
         &self.title

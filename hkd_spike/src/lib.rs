@@ -71,3 +71,4 @@ pub mod race;
 pub mod samples;
 pub mod srd;
 pub mod traits;
+mod test;

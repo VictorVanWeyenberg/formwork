@@ -110,8 +110,8 @@ impl RaceMode for RaceFinal {
 type RaceBlueprint = Race<RaceDraft>;
 ```
 
-The `slot` attribute means the field also has a mode. The `slots` attribute means this is a collection (one-generic) of
-a type that also has a mode. The `slot`/`slots` attribute should trigger generating the associated type in the `Mode`
+The `slot` attribute means the field may be a choice. The `slots` attribute means this is a collection (one-generic) of
+a type that may be a choice. The `slot`/`slots` attribute should trigger generating the associated type in the `Mode`
 trait and its implementors. The name of the associated type is the PascalCase of the field name.
 
 In the `Final` implementor, the type is the original type from the input struct. The `trans` predicate field means that
@@ -119,35 +119,31 @@ the field type is a `Blueprint` as well on its turn. If `trans`is present for fi
 `Slot<Field<FieldDraft>>`. The macro will assume ident `Field`+`Draft`exists. If`trans`is not present for field type
 `Field`, the type is `Slot<Field>`.
 
-| Attribute  | slot     | ~              | slots               | ~              | slot(transitive)  | ~                   | slots(transitive)   | ~                       |
-|------------|----------|----------------|---------------------|----------------|-------------------|---------------------|---------------------|-------------------------|
-| Field type | A        | Vec\<A>        | A                   | Vec\<A>        | A                 | Vec\<A>             | A                   | Vec\<A>                 |
-| Draft      | Slot\<A> | Slot\<Vec\<A>> | Invalid<sup>1</sup> | Vec\<Slot\<A>> | Slot\<A\<ADraft>> | Invalid<sup>2</sup> | Invalid<sup>1</sup> | Vec\<Slot\<A\<ADraft>>> |
-| Final      | A        | Vec\<A>        | Invalid<sup>1</sup> | Vec\<A>        | A                 | Invalid<sup>2</sup> | Invalid<sup>1</sup> | Vec\<A>                 |
+| # | Attribute        | Field type | Draft                      | Final   | Choice Type                   |
+|---|------------------|------------|----------------------------|---------|-------------------------------|
+| 1 | slot             | A          | SlotOne\<A>                | A       | Choice\<A> (one)              |
+| 2 | ~                | Vec\<A>    | SlotMany\<A>               | Vec\<A> | Choice\<A> (many As)          |
+| 3 | slots            | A          | ~                          | ~       | ~                             |
+| 4 | ~                | Vec\<A>    | Vec\<SlotOne\<A>>          | Vec\<A> | Choice\<A> (one per choice)   |
+| 5 | slot_transitive  | A          | SlotOne\<A\<ADraft>>       | A       | Choice\<A> (one)              |
+| 6 | ~                | Vec\<A>    | SlotMany\<A\<ADraft>>      | Vec\<A> | Choice\<A\<ADraft>> (many As) |
+| 7 | slots_transitive | A          | ~                          | ~       | ~                             |
+| 8 | ~                | Vec\<A>    | Vec\<SlotOne\<A\<ADraft>>> | Vec\<A> | Choice\<A> (one per choice)   |
 
-**Invalid<sup>1</sup>**: The attribute `slots` is meant for collections.
-
-**Invalid<sup>2</sup>**: A generic object cannot transitively be a blueprint. If this is a collection, you may want to
-use the `slots(transitive)` attribute.
-
-**Atomic Increments**
-
-4a. First do slot associated type generation and implementation. 4b. Then do slots associated type generation and
-implementation. 4c. Then do slot + trans associated type generation and implementation. 4d. Then do slots + trans
-associated type generation and implementation. 4e. Lastly change the fields in the input struct.
-
-5. Clean up code.
-
-- Mode trait still needed?
-- Node trait still needed?
-
-# Verification
-
-- Serialization + Deserialization is unchanged.
-- Choices can be added in any level of a deep-hierarchical structure.
-- Blueprint build can be completed.
-
-# Next issue
-
-Choice Prompt trait prevents from presenting the choices in a typed fashion. Choice is still generic which prevents th
-whole tree from being flattened into one collection of choices.
+1. The final field is of type `A`. Draft holds a slot of `A`, meaning either a fixed value or a choice. The user makes
+   **one choice** out of many instances of `A`.
+2. The final field is of type `Vec\<A>`. Draft holds a slot of `Vec\<A>`, meaning either a fixed value or a choice. The
+   user makes **many choices** out of many instances of `A`.
+3. The attribute `slots` is meant for collections.
+4. The final field is of type `Vec\<A>`. Draft holds many slots of `A`, meaning each slot many be either a fixed value
+   or a choice. Ths user makes **one choice** out of many instances of `A` for each slot that is a choice.
+5. The final field is of type `A`. Draft holds a slot of `A\<ADraft>`, meaning either a fixed value or a choice. The
+   user makes **one choice** out of many instances of `A\<ADraft>`. Each of those `A`s is still in Draft mode. This
+   choice needs to be made before making the deeper ones.
+6. The final field is of type `Vec\<A>`. Draft holds a slot of `Vec\<A\<ADraft>>`, meaning either a fixed value or a
+   choice. The user makes **many choices** out of many instances of `A\<ADraft>`. Each of those `A`s is still in Draft
+   mode. This choice needs to de made before making the deeper ones.
+7. The attribute `slots` is meant for collections.
+8. The final field is of type `Vec\<A>`. Draft holds many slots of `A\<ADraft>`, meaning each slot many be either a
+   fixed value or a choice. Ths user makes **one choice** out of many instances of `A\<ADraft>` for each slot that is a
+   choice. Each of those `A`s is still in Draft mode. This choice needs to de made before making the deeper ones.

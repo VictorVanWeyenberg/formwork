@@ -74,10 +74,12 @@ pub fn fighter() -> Race<RaceDraft> {
 /// Two slot fields of different kinds; the derive must visit them in declaration order.
 /// Shorthand `M::Kind` spelling (no builder here), so both derive detection paths are covered,
 /// and deliberately *without* `#[serde(bound = "")]`: with the shorthand, serde infers no bound on `M`.
-#[blueprint]
+#[blueprint(derive(Clone, PartialEq))]
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Both {
     pub label: String,
+    #[slots]
     pub effects: Vec<Effect>,
+    #[slots]
     pub traits: Vec<Trait>,
 }

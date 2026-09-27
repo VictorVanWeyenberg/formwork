@@ -1,7 +1,7 @@
 use crate::slot::{SlotField, SlotKind};
 use crate::{format_final_name, format_mode_name, generate_assoc_type_name};
 use quote::{quote, ToTokens};
-use syn::{Attribute, DataStruct, Ident, Visibility};
+use syn::{Attribute, Ident, Visibility};
 
 pub fn generate_struct(
     attrs: &Vec<Attribute>,

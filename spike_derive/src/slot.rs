@@ -1,8 +1,10 @@
-use crate::{format_draft_name};
-use itertools::Itertools;
+use crate::format_draft_name;
 use proc_macro2::Ident;
-use syn::{AngleBracketedGenericArguments, Attribute, Error, Field, GenericArgument, PathArguments, Type, TypePath};
 use std::ops::Not;
+use syn::{
+    AngleBracketedGenericArguments, Attribute, Error, Field, GenericArgument, PathArguments,
+    PathSegment, Type, TypePath,
+};
 
 pub struct SlotField {
     pub field: Field,
@@ -59,20 +61,39 @@ fn attribute_is_of_slot_kind(attr: &&Attribute) -> bool {
 
 fn attribute_as_slot_kind(attr: &Attribute, field: &Field) -> syn::Result<Option<SlotKind>> {
     if attr.path().is_ident("slot") {
-        Ok(Some(SlotKind::Slot {
-            ty: field.ty.clone(),
-        }))
+        if let Some(GenericArgument::Type(ty)) = get_vec_generic_type(&field.ty) {
+            Ok(Some(SlotKind::Slot {
+                ty: ty.clone(),
+                many: true,
+            }))
+        } else {
+            Ok(Some(SlotKind::Slot {
+                ty: field.ty.clone(),
+                many: false,
+            }))
+        }
     } else if attr.path().is_ident("slots") {
         Ok(Some(SlotKind::Slots {
             generic_argument: expect_vec(&field.ty)?.clone(),
         }))
     } else if attr.path().is_ident("slot_transitive") {
-        let name = expect_none_generic_path(&field.ty)?;
-        let draft_name = format_draft_name(name);
-        Ok(Some(SlotKind::SlotTransitive {
-            generic_type_name: name.clone(),
-            draft_name,
-        }))
+        if let Some(GenericArgument::Type(ty)) = get_vec_generic_type(&field.ty) {
+            let name = expect_none_generic_path(ty)?;
+            let draft_name = format_draft_name(name);
+            Ok(Some(SlotKind::SlotTransitive {
+                generic_type_name: name.clone(),
+                draft_name,
+                many: true,
+            }))
+        } else {
+            let name = expect_none_generic_path(&field.ty)?;
+            let draft_name = format_draft_name(name);
+            Ok(Some(SlotKind::SlotTransitive {
+                generic_type_name: name.clone(),
+                draft_name,
+                many: false,
+            }))
+        }
     } else if attr.path().is_ident("slots_transitive") {
         let name = expect_vec_generic_type_to_be_none_generic(&field.ty)?;
         let draft_name = format_draft_name(name);
@@ -89,10 +110,12 @@ fn attribute_as_slot_kind(attr: &Attribute, field: &Field) -> syn::Result<Option
 pub enum SlotKind {
     Slot {
         ty: Type,
+        many: bool,
     },
     SlotTransitive {
         generic_type_name: Ident,
         draft_name: Ident,
+        many: bool,
     },
     Slots {
         generic_argument: GenericArgument,
@@ -106,9 +129,9 @@ pub enum SlotKind {
 fn expect_none_generic_path(ty: &Type) -> syn::Result<&Ident> {
     match ty {
         Type::Path(TypePath {
-                       path: syn::Path { segments, .. },
-                       ..
-                   }) if segments.len() == 1 => segments
+            path: syn::Path { segments, .. },
+            ..
+        }) if segments.len() == 1 => segments
             .first()
             .unwrap()
             .arguments
@@ -133,13 +156,27 @@ fn expect_vec_generic_type_to_be_none_generic(ty: &Type) -> syn::Result<&Ident> 
 
 fn expect_none_generic_generic_argument(arg: &GenericArgument) -> syn::Result<&Ident> {
     match arg {
-        GenericArgument::Type(ty) => expect_none_generic_path(ty),
+        GenericArgument::Type(Type::Path(TypePath {
+            path: syn::Path { segments, .. },
+            ..
+        })) => {
+            if segments.len() == 1 {
+                let PathSegment { ident, arguments } = segments.first().unwrap();
+                if arguments.is_empty() {
+                    Ok(ident)
+                } else {
+                    Err(Error::new_spanned(ident, "Expected none generic argument"))
+                }
+            } else {
+                Err(Error::new_spanned(arg, "Path form not supported"))
+            }
+        }
         _ => Err(Error::new_spanned(arg, "Unsupported generic argument")),
     }
 }
 
 /// If type is Vec, returns the generic argument, else none.
-fn get_vec_generic_type(ty: &Type) -> Option<&GenericArgument> {
+pub fn get_vec_generic_type(ty: &Type) -> Option<&GenericArgument> {
     let Type::Path(TypePath { path, .. }) = ty else {
         return None;
     };
@@ -157,6 +194,6 @@ fn get_vec_generic_type(ty: &Type) -> Option<&GenericArgument> {
     };
     Some(
         args.first()
-            .expect("Vec ought to have one generic arugment"),
+            .expect("Vec ought to have one generic argument"),
     )
 }
