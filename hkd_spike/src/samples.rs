@@ -14,13 +14,13 @@ fn style(title: &str, description: &str) -> Trait {
 }
 
 /// Each option is a finished `Trait`, lifted into the draft by `ChoiceOption::single`'s `Into`.
-pub fn fighting_style() -> Choice<Trait<TraitDraft>> {
+pub fn fighting_style() -> Choice<Trait> {
     Choice::one(
         "Choose a fighting style.",
         [
-            ChoiceOption::single("Archery", style("Archery", "+2 to attack rolls with ranged weapons.")),
-            ChoiceOption::single("Defense", style("Defense", "+1 to AC while wearing armor.")),
-            ChoiceOption::single("Dueling", style("Dueling", "+2 damage with a one-handed melee weapon.")),
+            ChoiceOption::new("Archery", style("Archery", "+2 to attack rolls with ranged weapons.")),
+            ChoiceOption::new("Defense", style("Defense", "+1 to AC while wearing armor.")),
+            ChoiceOption::new("Dueling", style("Dueling", "+2 damage with a one-handed melee weapon.")),
         ],
     )
 }
@@ -32,7 +32,7 @@ pub fn asi(increase: isize, ability: Ability) -> Effect {
 fn asi_options(increase: isize) -> impl Iterator<Item = ChoiceOption<Effect>> {
     Ability::ALL
         .into_iter()
-        .map(move |ability| ChoiceOption::single(format!("{ability:?}"), asi(increase, ability)))
+        .map(move |ability| ChoiceOption::new(format!("{ability:?}"), asi(increase, ability)))
 }
 
 /// A choice whose options themselves contain choices.
@@ -46,16 +46,16 @@ pub fn ability_score_improvement() -> Choice<Trait<TraitDraft>> {
         .title("Ability Score Improvement")
         .description("Increase two ability scores by 1.")
         .with_effect(Choice::new(
-            "Choose two abilities to increase by 1.",
             Cardinality::exactly(2),
+            "Choose two abilities to increase by 1.",
             asi_options(1),
         ))
         .build();
     Choice::one(
         "Increase one score by 2, or two scores by 1?",
         [
-            ChoiceOption::single("+2 to one", plus_two),
-            ChoiceOption::single("+1 to two", plus_one_twice),
+            ChoiceOption::new("+2 to one", plus_two),
+            ChoiceOption::new("+1 to two", plus_one_twice),
         ],
     )
 }

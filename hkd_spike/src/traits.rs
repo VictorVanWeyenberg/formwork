@@ -14,13 +14,21 @@ use typed_builder::TypedBuilder;
 /// and demand `M: Serialize + Deserialize + Default`; `#[serde(bound = "")]` switches the
 /// inference off — the `Node` bounds on the associated types are all the impls need.
 #[blueprint(derive(Clone, PartialEq))]
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, TypedBuilder)]
 #[serde(bound = "")]
+#[builder(mutators(
+    pub fn with_effect(&mut self, effect: impl Into<<M as TraitMode>::Effects>) {
+        self.effects.push(effect.into())
+    }
+))]
 pub struct Trait {
+    #[builder(setter(into))]
     title: String,
+    #[builder(setter(into))]
     description: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[slots]
+    #[builder(default, via_mutators)]
     effects: Vec<Effect>,
 }
 

@@ -20,7 +20,7 @@ fn generate_field_trait_assoc_type(field: &SlotField) -> Option<proc_macro2::Tok
             SlotKind::SlotsTransitive { generic_type_name, .. } => generic_type_name.to_token_stream(),
         };
         Some(quote! {
-            #lvalue: crate::blueprint::Node + From<#field_type>;
+            #lvalue: crate::blueprint::Node;
         })
     } else {
         None

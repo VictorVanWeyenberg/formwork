@@ -89,24 +89,17 @@ impl std::error::Error for ChoiceError {}
 
 /// One option: a label and the complete value(s) it stands for. No patches: the option *is* the
 /// delta, at the position it fills.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ChoiceOption<T> {
-    label: String,
-    values: Vec<T>,
+    pub label: String,
+    pub value: T,
 }
 
 impl<T> ChoiceOption<T> {
-    pub fn single(label: impl Into<String>, value: impl Into<T>) -> Self {
+    pub fn new(label: impl Into<String>, value: impl Into<T>) -> Self {
         Self {
             label: label.into(),
-            values: vec![value.into()],
-        }
-    }
-
-    pub fn many(label: impl Into<String>, values: impl IntoIterator<Item = impl Into<T>>) -> Self {
-        Self {
-            label: label.into(),
-            values: values.into_iter().map(Into::into).collect(),
+            value: value.into(),
         }
     }
 
@@ -114,8 +107,8 @@ impl<T> ChoiceOption<T> {
         &self.label
     }
 
-    pub fn values(&self) -> &[T] {
-        &self.values
+    pub fn values(&self) -> &T {
+        &self.value
     }
 }
 
@@ -124,16 +117,16 @@ impl<T> ChoiceOption<T> {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Choice<T> {
     #[serde(rename = "choose")]
-    #[serde(skip_serializing_if = "is_default")]
-    cardinality: Cardinality,
-    prompt: String,
-    #[serde(
-        with = "options_map",
-        bound(serialize = "T: Serialize", deserialize = "T: Deserialize<'de>")
-    )]
-    options: Vec<ChoiceOption<T>>,
+    #[serde(skip_serializing_if = "cardinality_is_default")]
+    pub cardinality: Cardinality,
+    pub prompt: String,
+    pub options: Vec<ChoiceOption<T>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    selected: Vec<String>,
+    pub selected: Vec<String>,
+}
+
+fn cardinality_is_default(cardinality: &Cardinality) -> bool {
+    cardinality == &Cardinality::ONE
 }
 
 impl<T> Choice<T> {
@@ -195,7 +188,7 @@ impl<T> Choice<T> {
         self.options
             .iter()
             .filter(move |o| selected.contains(&o.label))
-            .flat_map(|o| o.values.iter())
+            .map(|o| &o.value)
     }
 
     pub fn selected_values_mut(&mut self) -> impl Iterator<Item = &mut T> {
@@ -203,7 +196,7 @@ impl<T> Choice<T> {
         self.options
             .iter_mut()
             .filter(move |o| selected.contains(&o.label))
-            .flat_map(|o| o.values.iter_mut())
+            .map(|o| &mut o.value)
     }
 
     /// Consume the choice, yielding the picked values (flattened).
@@ -218,7 +211,7 @@ impl<T> Choice<T> {
         Ok(options
             .into_iter()
             .filter(|o| selected.contains(&o.label))
-            .flat_map(|o| o.values)
+            .map(|o| o.value)
             .next()
             .unwrap())
     }
@@ -234,69 +227,7 @@ impl<T> Choice<T> {
         Ok(options
             .into_iter()
             .filter(|o| selected.contains(&o.label))
-            .flat_map(|o| o.values)
+            .map(|o| o.value)
             .collect())
-    }
-}
-
-/// `options` as an ordered JSON object `label → value | [values]`.
-mod options_map {
-    use super::ChoiceOption;
-    use serde::de::{Error as _, MapAccess, Visitor};
-    use serde::ser::SerializeMap;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::fmt;
-    use std::marker::PhantomData;
-
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum OneOrMany<T> {
-        One(T),
-        Many(Vec<T>),
-    }
-
-    pub fn serialize<T: Serialize, S: Serializer>(
-        options: &Vec<ChoiceOption<T>>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(Some(options.len()))?;
-        for option in options {
-            match option.values.as_slice() {
-                [single] => map.serialize_entry(&option.label, single)?,
-                many => map.serialize_entry(&option.label, many)?,
-            }
-        }
-        map.end()
-    }
-
-    pub fn deserialize<'de, T: Deserialize<'de>, D: Deserializer<'de>>(
-        deserializer: D,
-    ) -> Result<Vec<ChoiceOption<T>>, D::Error> {
-        struct OptionsVisitor<T>(PhantomData<T>);
-
-        impl<'de, T: Deserialize<'de>> Visitor<'de> for OptionsVisitor<T> {
-            type Value = Vec<ChoiceOption<T>>;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a map from option label to a value or a list of values")
-            }
-
-            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
-                let mut options: Vec<ChoiceOption<T>> = Vec::with_capacity(map.size_hint().unwrap_or(0));
-                while let Some((label, values)) = map.next_entry::<String, OneOrMany<T>>()? {
-                    if options.iter().any(|o| o.label == label) {
-                        return Err(A::Error::custom(format!("duplicate option label `{label}`")));
-                    }
-                    let values = match values {
-                        OneOrMany::One(value) => vec![value],
-                        OneOrMany::Many(values) => values,
-                    };
-                    options.push(ChoiceOption { label, values });
-                }
-                Ok(options)
-            }
-        }
-
-        deserializer.deserialize_map(OptionsVisitor(PhantomData))
     }
 }

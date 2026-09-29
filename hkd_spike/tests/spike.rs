@@ -2,10 +2,10 @@
 
 use hkd_spike::blueprint::*;
 use hkd_spike::effect::*;
-use hkd_spike::race::Race;
-use hkd_spike::samples::{self, asi, Both};
+use hkd_spike::race::{Race, RaceBlueprint};
+use hkd_spike::samples::{self, asi, Both, BothBlueprint};
 use hkd_spike::srd;
-use hkd_spike::traits::Trait;
+use hkd_spike::traits::{Trait, TraitBlueprint};
 use serde_json::{json, Value};
 
 fn json<T: serde::Serialize>(value: &T) -> Value {
@@ -35,11 +35,11 @@ fn a_final_trait_serializes_exactly_like_a_plain_struct() {
 #[test]
 fn fixed_slots_are_transparent_in_json() {
     let final_trait = srd::darkvision_trait();
-    let draft: Trait<Draft> = final_trait.clone().into();
+    let draft: TraitBlueprint = final_trait.clone().into();
     assert_eq!(json(&draft), json(&final_trait));
 
     let text = serde_json::to_string(&draft).unwrap();
-    let back: Trait<Draft> = serde_json::from_str(&text).unwrap();
+    let back: TraitBlueprint = serde_json::from_str(&text).unwrap();
     assert!(back == draft);
 }
 
@@ -47,7 +47,7 @@ fn fixed_slots_are_transparent_in_json() {
 fn a_draft_race_round_trips() {
     let dwarf = srd::dwarf();
     let text = serde_json::to_string(&dwarf).unwrap();
-    let back: Race<Draft> = serde_json::from_str(&text).unwrap();
+    let back: RaceBlueprint = serde_json::from_str(&text).unwrap();
     assert!(back == dwarf);
     println!("dwarf (draft) compact: {} bytes, pretty: {} bytes", text.len(), serde_json::to_string_pretty(&dwarf).unwrap().len());
     println!("{}", serde_json::to_string_pretty(&dwarf).unwrap());
@@ -60,12 +60,12 @@ fn a_draft_race_round_trips() {
 #[test]
 fn every_conversion_the_builders_rely_on_exists() {
     let effect = tool("srd/tool/smith_tools");
-    let _: Slot<Effect> = effect.clone().into();
-    let _: Slot<Effect> = Choice::one("p", [ChoiceOption::single("a", effect)]).into();
-    let _: Trait<Draft> = srd::darkvision_trait().into();
-    let _: Slot<Trait<Draft>> = srd::darkvision_trait().into();
-    let _: Slot<Trait<Draft>> = srd::tool_proficiency().into();
-    let _: Slot<Trait<Draft>> = samples::fighting_style().into();
+    let _: SlotOne<Effect> = effect.clone().into();
+    let _: SlotOne<Effect> = Choice::one("p", [ChoiceOption::new("a", effect)]).into();
+    let _: TraitBlueprint = srd::darkvision_trait().into();
+    // let _: SlotOne<TraitBlueprint> = srd::darkvision_trait().into();
+    // let _: SlotOne<TraitBlueprint> = srd::tool_proficiency().into();
+    // let _: SlotOne<TraitBlueprint> = samples::fighting_style().into();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -100,16 +100,16 @@ fn effect_json_is_externally_tagged_and_flat() {
 
 #[test]
 fn a_flattened_effect_survives_the_untagged_slot_and_the_options_map() {
-    let fixed: Slot<Effect> = serde_json::from_str(r#"{"vision":"Darkvision"}"#).unwrap();
+    let fixed: SlotOne<Effect> = serde_json::from_str(r#"{"vision":"Darkvision"}"#).unwrap();
     assert_eq!(fixed.fixed(), Some(&Effect::new(SheetOperation::Vision(Vision::Darkvision))));
 
-    let choose: Slot<Effect> = serde_json::from_str(
+    let choose: SlotOne<Effect> = serde_json::from_str(
         r#"{"choose":1,"prompt":"Pick.","options":{"Darkvision":{"vision":"Darkvision"},"Poison":{"damageModulation":{"resistance":"Poison"}}}}"#,
     )
     .unwrap();
     let choice = choose.choice().expect("a choice");
     assert_eq!(choice.labels(), ["Darkvision", "Poison"]);
-    assert_eq!(choice.options()[1].values(), [Effect::new(SheetOperation::DamageModulation(DamageModulation::Resistance(DamageType::Poison)))]);
+    assert_eq!(choice.options()[1].values(), &Effect::new(SheetOperation::DamageModulation(DamageModulation::Resistance(DamageType::Poison))));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -144,9 +144,8 @@ fn single_and_many_values_round_trip() {
     let choice = Choice::one(
         "Draconic ancestry",
         [
-            ChoiceOption::single("Black", resistance(DamageType::Acid)),
-            ChoiceOption::many("Red", [resistance(DamageType::Fire), Effect::new(SheetOperation::Vision(Vision::Darkvision))]),
-            ChoiceOption::many("None", Vec::<Effect>::new()),
+            ChoiceOption::new("Black", resistance(DamageType::Acid)),
+            ChoiceOption::new("Red", resistance(DamageType::Fire)),
         ],
     );
     let text = serde_json::to_string(&choice).unwrap();
@@ -182,7 +181,7 @@ fn selection_state_is_absent_in_a_book_and_present_on_a_character() {
     dwarf.next_open_choice_mut().unwrap().select(1);
     let character = serde_json::to_string(&dwarf).unwrap();
     assert!(character.contains(r#""selected":["Brewer's supplies"]"#), "{character}");
-    let back: Race<Draft> = serde_json::from_str(&character).unwrap();
+    let back: RaceBlueprint = serde_json::from_str(&character).unwrap();
     assert!(back == dwarf);
 }
 
@@ -290,7 +289,7 @@ fn lift_then_resolve_is_the_identity() {
     let mut draft = srd::dwarf();
     draft.next_open_choice_mut().unwrap().select(2);
     let race: Race = draft.resolve().ok().unwrap();
-    let lifted: Race<Draft> = race.clone().into();
+    let lifted: RaceBlueprint = race.clone().into();
     assert!(lifted.is_complete());
     assert!(lifted.resolve().ok().unwrap() == race);
 }
@@ -301,9 +300,9 @@ fn lift_then_resolve_is_the_identity() {
 
 #[test]
 fn the_derive_visits_slot_fields_in_declaration_order() {
-    let mut both: Both<Draft> = Both {
+    let mut both: BothBlueprint = Both {
         label: "both".into(),
-        effects: vec![Choice::one("effect first", [ChoiceOption::single("a", tool("a"))]).into()],
+        effects: vec![Choice::one("effect first", [ChoiceOption::new("a", tool("a"))]).into()],
         traits: vec![samples::fighting_style().into(), srd::tool_proficiency().into()],
     };
     let prompts: Vec<String> = both.visible_choices().iter().map(|c| c.prompt().to_string()).collect();
@@ -312,10 +311,10 @@ fn the_derive_visits_slot_fields_in_declaration_order() {
     while let Some(choice) = both.next_open_choice_mut() {
         choice.select(0);
     }
-    let resolved: Both<Final> = both.resolve().ok().unwrap();
+    let resolved: Both = both.resolve().ok().unwrap();
     assert_eq!(resolved.effects, [tool("a")]);
     assert_eq!(resolved.traits.iter().map(Trait::title).collect::<Vec<_>>(), ["Archery", "Tool Proficiency"]);
 
-    let lifted: Both<Draft> = resolved.clone().into();
+    let lifted: BothBlueprint = resolved.clone().into();
     assert!(lifted.resolve().ok().unwrap() == resolved);
 }

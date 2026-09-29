@@ -71,11 +71,11 @@ fn generate_slot_transitive_field_draft_assoc_type(
 ) -> proc_macro2::TokenStream {
     if *many {
         quote! {
-            crate::blueprint::SlotMany<#name<#draft_name>>
+            crate::blueprint::SlotManyTransitive<#name<#draft_name>>
         }
     } else {
         quote! {
-            crate::blueprint::SlotOne<#name<#draft_name>>
+            crate::blueprint::SlotOneTransitive<#name<#draft_name>>
         }
     }
 }
@@ -85,6 +85,6 @@ fn generate_slots_transitive_draft_assoc_type(
     draft_name: &Ident,
 ) -> proc_macro2::TokenStream {
     quote! {
-        crate::blueprint::SlotOne<#name<#draft_name>>
+        crate::blueprint::SlotOneTransitive<#name<#draft_name>>
     }
 }

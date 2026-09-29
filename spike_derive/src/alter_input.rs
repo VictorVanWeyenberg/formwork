@@ -1,4 +1,4 @@
-use crate::slot::{SlotField, SlotKind};
+use crate::slot::{attribute_is_of_slot_kind, SlotField, SlotKind};
 use crate::{format_final_name, format_mode_name, generate_assoc_type_name};
 use quote::{quote, ToTokens};
 use syn::{Attribute, Ident, Visibility};
@@ -30,6 +30,7 @@ fn generate_fields(mode_name: &Ident, fields: &Vec<SlotField>) -> Vec<proc_macro
 }
 
 fn generate_field(mode_name: &Ident, field: &SlotField) -> proc_macro2::TokenStream {
+    let attrs = remove_slot_attr(field.field.attrs.clone());
     let vis = &field.field.vis;
     let field_ident = &field.field.ident.clone().unwrap();
     let assoc_type_name = generate_assoc_type_name(&field.field);
@@ -37,11 +38,25 @@ fn generate_field(mode_name: &Ident, field: &SlotField) -> proc_macro2::TokenStr
         None => field.field.clone().into_token_stream(),
         Some(slot_kind) => match slot_kind {
             SlotKind::Slot { .. } | SlotKind::SlotTransitive { .. } => {
-                quote!(#vis #field_ident: <M as #mode_name>::#assoc_type_name)
+                quote! {
+                    #(#attrs
+                    )*
+                    #vis #field_ident: <M as #mode_name>::#assoc_type_name
+                }
             }
             SlotKind::Slots { .. } | SlotKind::SlotsTransitive { .. } => {
-                quote!(#vis #field_ident: Vec<<M as #mode_name>::#assoc_type_name>)
+                quote! {
+                    #(#attrs
+                    )*
+                    #vis #field_ident: Vec<<M as #mode_name>::#assoc_type_name>
+                }
             }
         },
     }
+}
+
+fn remove_slot_attr(attributes: Vec<Attribute>) -> Vec<Attribute> {
+    attributes.into_iter()
+        .filter(|attr| !attribute_is_of_slot_kind(&attr))
+        .collect()
 }

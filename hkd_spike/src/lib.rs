@@ -16,7 +16,7 @@
 //!     .title("Superior Darkvision")
 //!     .description("Choose your vision.")
 //!     .with_effect(Choice::one("Pick one.", [
-//!         ChoiceOption::single("Darkvision", Effect::new(SheetOperation::Vision(Vision::Darkvision))),
+//!         ChoiceOption::new("Darkvision", Effect::new(SheetOperation::Vision(Vision::Darkvision))),
 //!     ]))
 //!     .build();
 //! ```

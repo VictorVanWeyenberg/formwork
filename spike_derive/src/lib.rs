@@ -88,29 +88,19 @@ fn generate_mode_tokens(
     let draft_assoc_types = generate_field_draft_assoc_types(fields);
     let final_assoc_types = generate_field_final_assoc_types(fields);
     let trait_assoc_types = generate_field_trait_assoc_types(fields);
-    Ok(if !derives.is_empty() {
-        quote! {
-            #vis trait #mode_name {
-                #(#trait_assoc_types)*
-            }
-            #[derive(#(#derives), *)]
-            #vis struct #draft_name;
-            #[derive(#(#derives), *)]
-            #vis struct #final_name;
-            impl #mode_name for #draft_name {
-                #(#draft_assoc_types)*
-            }
-            impl #mode_name for #final_name {
-                #(#final_assoc_types)*
-            }
-            #vis type #blueprint_name = #name<#draft_name>;
-        }
+    let derives = if derives.is_empty() {
+        quote! {}
     } else {
+        quote! { #[derive(#(#derives), *)] }
+    };
+    Ok(
         quote! {
             #vis trait #mode_name {
                 #(#trait_assoc_types)*
             }
+            #derives
             #vis struct #draft_name;
+            #derives
             #vis struct #final_name;
             impl #mode_name for #draft_name {
                 #(#draft_assoc_types)*
@@ -120,7 +110,7 @@ fn generate_mode_tokens(
             }
             #vis type #blueprint_name = #name<#draft_name>;
         }
-    })
+    )
 }
 
 fn format_blueprint_name(name: &Ident) -> Ident {

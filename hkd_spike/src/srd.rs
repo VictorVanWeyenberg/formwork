@@ -4,16 +4,16 @@
 use crate::blueprint::{Choice, ChoiceOption};
 use crate::effect::*;
 use crate::race::{Race, RaceBlueprint};
-use crate::traits::{Trait, TraitDraft};
+use crate::traits::{Trait, TraitBlueprint, TraitDraft};
 
 pub fn ability_score_increase_trait(increase: isize, ability: Ability) -> Trait {
     Trait::builder()
         .title("Ability Score Increase")
         .description(format!("Your {ability:?} score increases by {increase}."))
-        .with_permanent_effect(SheetOperation::AbilityScoreIncrease(AbilityScoreIncrease::Racial {
+        .with_effect(Effect::new(SheetOperation::AbilityScoreIncrease(AbilityScoreIncrease::Racial {
             increase,
             ability,
-        }))
+        })))
         .build()
 }
 
@@ -21,7 +21,7 @@ pub fn size_trait(size: Size) -> Trait {
     Trait::builder()
         .title("Size")
         .description(format!("Your size is {size:?}."))
-        .with_permanent_effect(SheetOperation::RaceSize(size))
+        .with_effect(Effect::new(SheetOperation::RaceSize(size)))
         .build()
 }
 
@@ -29,7 +29,7 @@ pub fn darkvision_trait() -> Trait {
     Trait::builder()
         .title("Darkvision")
         .description("You can see in dim light within 60 feet of you as if it were bright light.")
-        .with_permanent_effect(SheetOperation::Vision(Vision::Darkvision))
+        .with_effect(Effect::new(SheetOperation::Vision(Vision::Darkvision)))
         .build()
 }
 
@@ -37,8 +37,8 @@ fn speed() -> Trait {
     Trait::builder()
         .title("Speed")
         .description("Your base walking speed is 25 feet. Your speed is not reduced by wearing heavy armor.")
-        .with_permanent_effect(SheetOperation::RaceWalkingSpeed(Speed(25)))
-        .with_permanent_effect(SheetOperation::IgnoreRule(Rule::HeavyArmorSpeedPenalty))
+        .with_effect(Effect::new(SheetOperation::RaceWalkingSpeed(Speed(25))))
+        .with_effect(Effect::new(SheetOperation::IgnoreRule(Rule::HeavyArmorSpeedPenalty)))
         .build()
 }
 
@@ -46,9 +46,9 @@ fn dwarven_resilience() -> Trait {
     Trait::builder()
         .title("Dwarven Resilience")
         .description("You have resistance against poison damage.")
-        .with_permanent_effect(SheetOperation::DamageModulation(DamageModulation::Resistance(
+        .with_effect(Effect::new(SheetOperation::DamageModulation(DamageModulation::Resistance(
             DamageType::Poison,
-        )))
+        ))))
         .build()
 }
 
@@ -77,19 +77,19 @@ pub fn tool_proficiency_effect(tool: &str) -> Effect {
 
 /// The only Dwarf trait that needs a choice: a `Choice<Effect>` sits where the effect will be.
 /// `Trait::builder()` infers `M = Draft` from the return type (no turbofish needed).
-pub fn tool_proficiency() -> Trait<TraitDraft> {
+pub fn tool_proficiency() -> TraitBlueprint {
     Trait::builder()
         .title("Tool Proficiency")
         .description("You gain proficiency with the artisan's tools of your choice: smith's tools, brewer's supplies, or mason's tools.")
         .with_effect(Choice::one(
             "Choose one tool to be proficient with.",
-            ARTISAN_TOOLS.map(|(label, tool)| ChoiceOption::single(label, tool_proficiency_effect(tool))),
+            ARTISAN_TOOLS.map(|(label, tool)| ChoiceOption::new(label, tool_proficiency_effect(tool))),
         ))
         .build()
 }
 
 pub fn dwarf() -> RaceBlueprint {
-    Race::builder()
+    RaceBlueprint::builder()
         .id("srd/race/dwarf")
         .name("Dwarf")
         .description("Digs holes and likes to drink.")

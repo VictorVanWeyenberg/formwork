@@ -51,7 +51,7 @@ impl TryFrom<Field> for SlotField {
     }
 }
 
-fn attribute_is_of_slot_kind(attr: &&Attribute) -> bool {
+pub fn attribute_is_of_slot_kind(attr: &&Attribute) -> bool {
     let path = attr.path();
     path.is_ident("slot")
         || path.is_ident("slots")
@@ -108,18 +108,31 @@ fn attribute_as_slot_kind(attr: &Attribute, field: &Field) -> syn::Result<Option
 
 #[derive(Clone, PartialEq)]
 pub enum SlotKind {
+    /// One slot but the type is a leaf type i.e. not a blueprint of its own.
+    ///
+    /// `#ty` turns into `SlotOne<#ty>`. `Vec<#ty>` turns into `SlotMany<#ty>` (many = true).
     Slot {
         ty: Type,
         many: bool,
     },
+    /// One slot but the type is also a blueprint.
+    ///
+    /// `#ty` turns into `SlotOneTransitive<#ty>`. `Vec<#ty>` turns into `SlotManyTransitive<#ty>`
+    /// (many = true).
     SlotTransitive {
         generic_type_name: Ident,
         draft_name: Ident,
         many: bool,
     },
+    /// Many slots but the inner type is a leaf type i.e. not a blueprint of its own.
+    ///
+    /// `Vec<#ty>` turns into `Vec<SlotOne<#ty>>`. Not allowed on single types.
     Slots {
         generic_argument: GenericArgument,
     },
+    /// Many slots but the inner type is also a blueprint.
+    ///
+    /// `Vec<#ty>` turns into `Vec<SlotOneTransitive<#ty>>`. Not allowed on single types.
     SlotsTransitive {
         generic_type_name: Ident,
         draft_name: Ident,
@@ -154,7 +167,7 @@ fn expect_vec_generic_type_to_be_none_generic(ty: &Type) -> syn::Result<&Ident> 
     expect_vec(ty).and_then(expect_none_generic_generic_argument)
 }
 
-fn expect_none_generic_generic_argument(arg: &GenericArgument) -> syn::Result<&Ident> {
+pub fn expect_none_generic_generic_argument(arg: &GenericArgument) -> syn::Result<&Ident> {
     match arg {
         GenericArgument::Type(Type::Path(TypePath {
             path: syn::Path { segments, .. },
