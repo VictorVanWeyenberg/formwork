@@ -1,8 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use crate::ast::SchematicStruct;
+use crate::ast::{SchematicStruct, SchematicArgs};
+use ident_case::RenameRule;
 
-pub fn generate_modes(ast: &SchematicStruct) -> TokenStream {
+pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStream {
     let name = &ast.ident;
     let mode_trait = format_ident!("{}Mode", name);
     let unresolved_struct = format_ident!("{}Unresolved", name);
@@ -12,65 +13,79 @@ pub fn generate_modes(ast: &SchematicStruct) -> TokenStream {
     let mut unresolved_fields = Vec::new();
     let mut resolved_fields = Vec::new();
 
-    for field in &ast.fields {
-        let field_name = &field.ident;
-        let mode_type_name = format_ident!("{}", snake_to_camel(&field_name.to_string()));
-        let field_type = &field.ty;
+    if let darling::ast::Data::Struct(fields) = &ast.data {
+        for field in &fields.fields {
+            if field.is_slot() {
+                let field_name = field.ident.as_ref().unwrap();
+                let camel_name = RenameRule::PascalCase.apply_to_field(&field_name.to_string());
+                let mode_type_name = format_ident!("{}", camel_name);
+                let field_type = &field.ty;
 
-        mode_types.push(quote! { type #mode_type_name; });
-
-        if let Some(config) = &field.config {
-            let unresolved_inner_type = if config.is_cascade {
-                let base = field.base_type();
-                let unresolved_inner_mode = format_ident!("{}Unresolved", base_ident_name(base).unwrap());
-                quote! { #base<#unresolved_inner_mode> }
-            } else {
-                let base = field.base_type();
-                quote! { #base }
-            };
-
-            let _is_collection_field = field.inner_type_if_vec().is_some();
-
-            match (config.is_collection, config.is_pick) {
-                (true, _) => {
-                    // slot_type == "vec"
-                    let base_inner_type = field.base_type();
-                    unresolved_fields.push(quote! { type #mode_type_name = schematic::Slot<#unresolved_inner_type>; });
-                    resolved_fields.push(quote! { type #mode_type_name = #base_inner_type; });
-                },
-                (_, true) => {
-                    // slot_type == "choice"
-                    unresolved_fields.push(quote! { type #mode_type_name = schematic::Slot<#unresolved_inner_type>; });
-                    resolved_fields.push(quote! { type #mode_type_name = #field_type; });
-                },
-                _ => {
-                    // slot_type == "scalar"
-                    unresolved_fields.push(quote! { type #mode_type_name = schematic::Slot<#unresolved_inner_type>; });
-                    resolved_fields.push(quote! { type #mode_type_name = #field_type; });
+                let mut mode_bounds = Vec::new();
+                for path in &*args.derives {
+                    if let Some(segment) = path.segments.last() {
+                        if segment.ident == "Deserialize" {
+                            mode_bounds.push(quote! { for<'schematic_a> #path<'schematic_a> });
+                            continue;
+                        }
+                    }
+                    mode_bounds.push(quote! { #path });
                 }
-            }
-        } else {
-            let is_collection_field = field.inner_type_if_vec().is_some();
-            let base_inner_type = field.base_type();
-            
-            if is_collection_field {
-                unresolved_fields.push(quote! { type #mode_type_name = #base_inner_type; });
-                resolved_fields.push(quote! { type #mode_type_name = #base_inner_type; });
-            } else {
-                unresolved_fields.push(quote! { type #mode_type_name = #field_type; });
-                resolved_fields.push(quote! { type #mode_type_name = #field_type; });
+                
+                let bounds_tokens = if mode_bounds.is_empty() {
+                    quote! {}
+                } else {
+                    quote! { : #(#mode_bounds)+* }
+                };
+
+                mode_types.push(quote! { type #mode_type_name #bounds_tokens; });
+
+                let config = field.slot_config().unwrap().unwrap();
+
+                let unresolved_inner_type = if config.cascade {
+                    let base = field.base_type();
+                    let unresolved_inner_mode = format_ident!("{}Unresolved", base_ident_name(base).unwrap());
+                    quote! { #base<#unresolved_inner_mode> }
+                } else {
+                    let base = field.base_type();
+                    quote! { #base }
+                };
+
+                match (config.collection, config.pick) {
+                    (true, _) => {
+                        let base_inner_type = field.base_type();
+                        unresolved_fields.push(quote! { type #mode_type_name = schematic::Slot<#unresolved_inner_type>; });
+                        resolved_fields.push(quote! { type #mode_type_name = #base_inner_type; });
+                    },
+                    (_, true) => {
+                        unresolved_fields.push(quote! { type #mode_type_name = schematic::Slot<#unresolved_inner_type>; });
+                        resolved_fields.push(quote! { type #mode_type_name = #field_type; });
+                    },
+                    _ => {
+                        unresolved_fields.push(quote! { type #mode_type_name = schematic::Slot<#unresolved_inner_type>; });
+                        resolved_fields.push(quote! { type #mode_type_name = #field_type; });
+                    }
+                }
             }
         }
     }
+
+    let derives = if args.derives.is_empty() {
+        quote! {}
+    } else {
+        let paths = &args.derives;
+        quote! { #[derive(#(#paths),*)] }
+    };
 
     quote! {
         pub trait #mode_trait {
             #(#mode_types)*
         }
 
-        #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+        #derives
         pub struct #unresolved_struct;
-        #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+        
+        #derives
         pub struct #resolved_struct;
 
         impl #mode_trait for #unresolved_struct {
@@ -81,22 +96,6 @@ pub fn generate_modes(ast: &SchematicStruct) -> TokenStream {
             #(#resolved_fields)*
         }
     }
-}
-
-pub fn snake_to_camel(s: &str) -> String {
-    let mut camel = String::new();
-    let mut next_cap = true;
-    for c in s.chars() {
-        if c == '_' {
-            next_cap = true;
-        } else if next_cap {
-            camel.push(c.to_ascii_uppercase());
-            next_cap = false;
-        } else {
-            camel.push(c);
-        }
-    }
-    camel
 }
 
 fn base_ident_name(ty: &syn::Type) -> Option<String> {

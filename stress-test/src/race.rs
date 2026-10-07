@@ -1,17 +1,20 @@
 use crate::contentref::{RaceRef, Referable, SubraceRef};
-use crate::traits::Trait;
+use crate::traits::{Trait, TraitUnresolved};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Display, Formatter};
+use schematic::schematic;
 
+#[schematic(builder, derives(Clone, PartialEq, Serialize, Deserialize))]
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Race {
     #[serde_as(as = "DisplayFromStr")]
     id: RaceRef,
-        name: String,
-        description: String,
-        pub (crate) traits: Vec<Trait>,
+    name: String,
+    description: String,
+    #[slot(collection, cascade)]
+    pub (crate) traits: Vec<Trait>,
 }
 
 impl Referable for Race {

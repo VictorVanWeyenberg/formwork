@@ -1,146 +1,125 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use crate::ast::SchematicStruct;
-use std::collections::HashSet;
 
 pub fn generate_visitor(ast: &SchematicStruct) -> TokenStream {
     let name = &ast.ident;
-    let schematic_type = format_ident!("{}Schematic", name);
+    let unresolved_struct = format_ident!("{}Unresolved", name);
 
-    let mut choice_types = HashSet::new();
-    let mut nested_types = HashSet::new();
+    let mut visitor_bounds = Vec::new();
+    let mut walk_logic = Vec::new();
 
-    let mut depth_0_visits = Vec::new();
-    let mut depth_0_has_children = Vec::new();
-    let mut depth_n_visits = Vec::new();
+    if let darling::ast::Data::Struct(fields) = &ast.data {
+        for field in &fields.fields {
+            let field_name = field.ident.as_ref().unwrap();
 
-    for field in &ast.fields {
-        let field_name = &field.ident;
+            if field.is_slot() {
+                let config = field.slot_config().unwrap().unwrap();
+                let unresolved_inner_type = if config.cascade {
+                    let base = field.base_type();
+                    let unresolved_inner_mode = format_ident!("{}Unresolved", crate::ast::base_ident_name(base).unwrap());
+                    quote! { #base<#unresolved_inner_mode> }
+                } else {
+                    let base = field.base_type();
+                    quote! { #base }
+                };
 
-        if let Some(config) = &field.config {
-            let unresolved_inner_type = if config.is_cascade {
-                let base = field.base_type();
-                let unresolved_inner_mode = format_ident!("{}Unresolved", crate::ast::base_ident_name(base).unwrap());
-                let inner = quote! { #base<#unresolved_inner_mode> };
-                nested_types.insert(inner.to_string());
-                inner
-            } else {
-                let base = field.base_type();
-                quote! { #base }
-            };
-
-            if config.is_collection || config.is_pick {
-                choice_types.insert(unresolved_inner_type.to_string());
-            }
-
-            // Depth 0: check choices
-            if config.is_collection {
-                depth_0_visits.push(quote! {
-                    for slot in &mut self.#field_name {
-                        if let schematic::Slot::Choose(choice) = slot {
-                            let flow = visitor.visit_choice(choice);
-                            if flow != schematic::visitor::VisitorFlow::Continue {
-                                return schematic::Level::from_flow(flow);
-                            }
-                        }
-                    }
+                visitor_bounds.push(quote! {
+                    V: schematic::ChoiceVisitor<#unresolved_inner_type>
                 });
-            } else if config.is_pick {
-                depth_0_visits.push(quote! {
-                    if let schematic::Slot::Choose(choice) = &mut self.#field_name {
-                        let flow = visitor.visit_choice(choice);
-                        if flow != schematic::visitor::VisitorFlow::Continue {
-                            return schematic::Level::from_flow(flow);
-                        }
-                    }
-                });
-            }
 
-            // Has children checks and Depth N recursion
-            if config.is_cascade {
-                if config.is_collection {
-                    depth_0_has_children.push(quote! {
-                        self.#field_name.iter().any(|slot| !slot.selected_values().is_empty())
+                if config.cascade {
+                    visitor_bounds.push(quote! {
+                        #unresolved_inner_type: schematic::Walkable<V>
                     });
+                }
 
-                    depth_n_visits.push(quote! {
+                if config.collection {
+                    walk_logic.push(quote! {
                         for slot in &mut self.#field_name {
-                            for child in slot.selected_values_mut() {
-                                level.combine(schematic::Walkable::walk_level(child, visitor, depth - 1));
-                                if level.flow == schematic::visitor::VisitorFlow::Break {
-                                    return level;
+                            if let schematic::Slot::Choose(choice) = slot {
+                                let flow = visitor.visit_choice(choice);
+                                if flow != schematic::VisitorFlow::Continue {
+                                    return schematic::Level::from_flow(flow);
                                 }
                             }
                         }
                     });
-                } else if config.is_pick {
-                    depth_0_has_children.push(quote! {
-                        !self.#field_name.selected_values().is_empty()
-                    });
 
-                    depth_n_visits.push(quote! {
-                        for child in self.#field_name.selected_values_mut() {
-                            level.combine(schematic::Walkable::walk_level(child, visitor, depth - 1));
-                            if level.flow == schematic::visitor::VisitorFlow::Break {
-                                return level;
+                    if config.cascade {
+                        walk_logic.push(quote! {
+                            for slot in &mut self.#field_name {
+                                if let Some(child) = slot.as_fixed_mut() {
+                                    let flow = schematic::Schematic::walk_choices(child, visitor);
+                                    if flow == schematic::VisitorFlow::Break {
+                                        return schematic::Level::from_flow(flow);
+                                    }
+                                }
+                                if let Some(choice) = slot.as_choice_mut() {
+                                    for child in choice.selected_values_mut() {
+                                        let flow = schematic::Schematic::walk_choices(child, visitor);
+                                        if flow == schematic::VisitorFlow::Break {
+                                            return schematic::Level::from_flow(flow);
+                                        }
+                                    }
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 } else {
-                    depth_0_has_children.push(quote! {
-                        !self.#field_name.selected_values().is_empty()
-                    });
-
-                    depth_n_visits.push(quote! {
-                        for child in self.#field_name.selected_values_mut() {
-                            level.combine(schematic::Walkable::walk_level(child, visitor, depth - 1));
-                            if level.flow == schematic::visitor::VisitorFlow::Break {
-                                return level;
+                    walk_logic.push(quote! {
+                        if let schematic::Slot::Choose(choice) = &mut self.#field_name {
+                            let flow = visitor.visit_choice(choice);
+                            if flow != schematic::VisitorFlow::Continue {
+                                return schematic::Level::from_flow(flow);
                             }
                         }
                     });
+
+                    if config.cascade {
+                        walk_logic.push(quote! {
+                            if let Some(child) = self.#field_name.as_fixed_mut() {
+                                let flow = schematic::Schematic::walk_choices(child, visitor);
+                                if flow == schematic::VisitorFlow::Break {
+                                    return schematic::Level::from_flow(flow);
+                                }
+                            }
+                            if let Some(choice) = self.#field_name.as_choice_mut() {
+                                for child in choice.selected_values_mut() {
+                                    let flow = schematic::Schematic::walk_choices(child, visitor);
+                                    if flow == schematic::VisitorFlow::Break {
+                                        return schematic::Level::from_flow(flow);
+                                    }
+                                }
+                            }
+                        });
+                    }
                 }
             }
         }
     }
 
-    let choice_bounds: Vec<_> = choice_types.iter()
-        .map(|s| {
-            let ty: syn::Type = syn::parse_str(s).unwrap();
-            quote! { V: schematic::visitor::ChoiceVisitor<#ty> }
-        }).collect();
-
-    let nested_bounds: Vec<_> = nested_types.iter()
-        .map(|s| {
-            let ty: syn::Type = syn::parse_str(s).unwrap();
-            quote! { #ty: schematic::Walkable<V> }
-        }).collect();
-
-    let where_clause = if choice_bounds.is_empty() && nested_bounds.is_empty() {
-        quote! {}
-    } else {
-        let all_bounds = choice_bounds.into_iter().chain(nested_bounds);
-        quote! { where #(#all_bounds),* }
-    };
-
-    let has_children_expr = if depth_0_has_children.is_empty() {
-        quote! { false }
-    } else {
-        quote! { #(#depth_0_has_children)||* }
-    };
+    if visitor_bounds.is_empty() {
+        return quote! {
+            impl<V> schematic::Walkable<V> for #name<#unresolved_struct> {
+                fn walk_level(&mut self, _visitor: &mut V, _depth: usize) -> schematic::Level {
+                    schematic::Level::continue_level(false)
+                }
+            }
+        };
+    }
 
     quote! {
-        impl<V> schematic::Walkable<V> for #schematic_type 
-        #where_clause
+        impl<V> schematic::Walkable<V> for #name<#unresolved_struct>
+        where
+            #(#visitor_bounds),*
         {
             fn walk_level(&mut self, visitor: &mut V, depth: usize) -> schematic::Level {
                 if depth == 0 {
-                    #(#depth_0_visits)*
-                    schematic::Level::continue_level(#has_children_expr)
+                    #(#walk_logic)*
+                    schematic::Level::continue_level(false)
                 } else {
-                    let mut level = schematic::Level::continue_level(false);
-                    #(#depth_n_visits)*
-                    level
+                    schematic::Level::continue_level(false)
                 }
             }
         }

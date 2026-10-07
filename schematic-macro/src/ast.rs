@@ -1,106 +1,87 @@
-use syn::{Error, Field, Ident, ItemStruct, Meta, Type};
+use darling::{FromDeriveInput, FromField, FromMeta};
+use syn::{Attribute, DeriveInput, Ident, Meta, Type};
 
+#[derive(Debug, FromMeta, Default)]
+pub struct SchematicArgs {
+    #[darling(default)]
+    pub builder: bool,
+    #[darling(default)]
+    pub derives: darling::util::PathList,
+}
+
+#[derive(Debug, FromDeriveInput)]
+#[darling(forward_attrs(allow, doc, cfg))]
 pub struct SchematicStruct {
     pub ident: Ident,
-    pub fields: Vec<SchematicField>,
-    pub attrs: Vec<syn::Attribute>,
-    pub generate_builder: bool,
+    pub data: darling::ast::Data<(), SchematicField>,
 }
 
+#[derive(Debug, FromField)]
+#[darling(forward_attrs(slot, allow, doc, cfg))]
 pub struct SchematicField {
-    pub ident: Ident,
+    pub ident: Option<Ident>,
     pub ty: Type,
-    pub config: Option<SlotConfig>,
+    pub attrs: Vec<Attribute>,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
 pub struct SlotConfig {
-    pub is_collection: bool,
-    pub is_pick: bool,
-    pub is_cascade: bool,
+    pub collection: bool,
+    pub pick: bool,
+    pub cascade: bool,
 }
 
 impl SchematicStruct {
-    pub fn parse(item: ItemStruct) -> Result<Self, Error> {
-        if !item.generics.params.is_empty() {
-            return Err(Error::new_spanned(item.generics, "#[schematic] does not support generics"));
-        }
-
-        let fields = match item.fields {
-            syn::Fields::Named(fields) => fields,
-            _ => return Err(Error::new_spanned(item.ident, "#[schematic] is only allowed on structs with named fields")),
-        };
-
-        let parsed_fields = fields
-            .named
-            .into_iter()
-            .map(SchematicField::parse)
-            .collect::<Result<Vec<_>, Error>>()?;
-
-        Ok(SchematicStruct {
-            ident: item.ident,
-            fields: parsed_fields,
-            attrs: item.attrs,
-            generate_builder: false, // Set this in lib.rs
-        })
+    pub fn parse_input(item: &DeriveInput) -> Result<Self, darling::Error> {
+        Self::from_derive_input(item)
     }
 }
 
 impl SchematicField {
-    fn parse(field: Field) -> Result<Self, Error> {
-        let ident = field.ident.clone().unwrap();
-        let mut config = None;
+    pub fn slot_config(&self) -> Result<Option<SlotConfig>, darling::Error> {
+        let mut has_slot = false;
+        let mut config = SlotConfig { collection: false, pick: false, cascade: false };
 
-        for attr in &field.attrs {
+        for attr in &self.attrs {
             if attr.path().is_ident("slot") {
-                let mut slot_config = SlotConfig::default();
-                
+                has_slot = true;
                 if let Meta::List(meta) = &attr.meta {
-                    meta.parse_nested_meta(|meta| {
+                    let res = meta.parse_nested_meta(|meta| {
                         if meta.path.is_ident("collection") {
-                            slot_config.is_collection = true;
+                            config.collection = true;
                         } else if meta.path.is_ident("pick") {
-                            slot_config.is_pick = true;
+                            config.pick = true;
                         } else if meta.path.is_ident("cascade") {
-                            slot_config.is_cascade = true;
+                            config.cascade = true;
                         } else {
                             return Err(meta.error("unsupported slot attribute argument"));
                         }
                         Ok(())
-                    })?;
+                    });
+                    if let Err(e) = res {
+                        return Err(darling::Error::from(e));
+                    }
                 }
-                config = Some(slot_config);
             }
         }
 
-        Ok(SchematicField {
-            ident,
-            ty: field.ty,
-            config,
-        })
+        if has_slot {
+            if config.collection && config.pick {
+                return Err(darling::Error::custom("`collection` and `pick` cannot be used together in #[slot]").with_span(&self.ident));
+            }
+            Ok(Some(config))
+        } else {
+            Ok(None)
+        }
     }
-}
 
-impl SchematicField {
+    pub fn is_slot(&self) -> bool {
+        self.slot_config().unwrap_or(None).is_some()
+    }
+
     pub fn base_type(&self) -> &Type {
-        let _is_collection = self.config.map(|c| c.is_collection).unwrap_or(false);
-        let mut is_collection_field = false;
-        
-        let inner_type_if_vec = if let syn::Type::Path(syn::TypePath { path, .. }) = &self.ty {
-            if let Some(segment) = path.segments.last() {
-                if segment.ident == "Vec" {
-                    is_collection_field = true;
-                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                        if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
-                            Some(inner_ty)
-                        } else { None }
-                    } else { None }
-                } else { None }
-            } else { None }
-        } else { None };
-        
+        let is_collection_field = self.inner_type_if_vec().is_some();
         if is_collection_field {
-            inner_type_if_vec.unwrap_or(&self.ty)
+            self.inner_type_if_vec().unwrap()
         } else {
             &self.ty
         }

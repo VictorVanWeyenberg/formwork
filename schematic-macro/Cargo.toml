@@ -7,6 +7,8 @@ edition = "2024"
 proc-macro = true
 
 [dependencies]
+darling = "0.24.1"
+ident_case = "1.0.1"
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
 syn = { version = "3.0.6", features = ["full"] }
@@ -14,7 +16,6 @@ syn = { version = "3.0.6", features = ["full"] }
 schematic = { path = "../schematic" }
 typed-builder = "0.23"
 serde = { version = "1.0", features = ["derive"] }
+trybuild = "1.0.121"
 
-[features]
-default = ["builders"]
-builders = []
+

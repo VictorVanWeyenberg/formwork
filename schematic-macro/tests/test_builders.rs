@@ -12,7 +12,6 @@ struct Root {
 }
 
 #[test]
-#[cfg(feature = "builders")]
 fn test_builders() {
     let mut unresolved: RootSchematic = Root::builder()
         .leaf("hi".to_string())
