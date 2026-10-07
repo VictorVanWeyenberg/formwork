@@ -140,3 +140,44 @@ fn test_nested_choice() {
     assert_eq!(final_warlock.invocations[0].spell_choice, "Eldritch Blast");
     assert_eq!(final_warlock.invocations[1].spell_choice, "Armor of Agathys");
 }
+
+#[test]
+#[cfg(feature = "builders")]
+fn test_builders() {
+    let mut draft: RootBlueprint = Root::builder()
+        .leaf(blueprint::Slot::Fixed("hi".to_string()))
+        .with_dwarf_traits(blueprint::Slot::Fixed("trait1".to_string()))
+        .class_skills(blueprint::Slot::Choose(
+            blueprint::Choice::new("Pick skills", vec![
+                blueprint::ChoiceOption::new("A", "A".to_string()),
+                blueprint::ChoiceOption::new("B", "B".to_string()),
+                blueprint::ChoiceOption::new("C", "C".to_string()),
+            ]).with_cardinality(blueprint::Cardinality::Exact(2))
+        ))
+        .build();
+
+    // Now test draft methods generated on the struct
+    draft.add_dwarf_traits_choice(blueprint::Choice::new("Pick trait", vec![
+        blueprint::ChoiceOption::new("trait2", "trait2".to_string()),
+        blueprint::ChoiceOption::new("trait3", "trait3".to_string()),
+    ]));
+
+    assert!(!draft.is_complete());
+    
+    if let Some(c) = draft.dwarf_traits[1].as_choice_mut() {
+        c.select(0).unwrap();
+    }
+    
+    if let Some(c) = draft.class_skills.as_choice_mut() {
+        c.select(0).unwrap();
+        c.select(1).unwrap();
+    }
+    
+    assert!(draft.is_complete());
+    
+    let final_root = draft.resolve().unwrap();
+    assert_eq!(final_root.leaf, "hi");
+    assert_eq!(final_root.dwarf_traits, vec!["trait1".to_string(), "trait2".to_string()]);
+    assert_eq!(final_root.class_skills, vec!["A".to_string(), "B".to_string()]);
+}
+

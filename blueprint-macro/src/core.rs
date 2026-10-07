@@ -30,11 +30,18 @@ pub fn generate_blueprint(item: ItemStruct) -> Result<proc_macro2::TokenStream, 
         }
     };
 
+    let mode_trait = format_ident!("{}Mode", name);
+    let draft_struct = format_ident!("{}Draft", name);
+    let final_struct = format_ident!("{}Final", name);
+    let blueprint_type = format_ident!("{}Blueprint", name);
+
     let mut draft_fields = Vec::new();
     let mut final_fields = Vec::new();
     let mut struct_fields = Vec::new();
     let mut complete_checks = Vec::new();
     let mut resolve_fields = Vec::new();
+    let mut mutators = Vec::new();
+    let mut draft_methods = Vec::new();
 
     for field in fields {
         let field_name = field.ident.as_ref().unwrap();
@@ -63,26 +70,30 @@ pub fn generate_blueprint(item: ItemStruct) -> Result<proc_macro2::TokenStream, 
         }
         
         let mode_type_name = format_ident!("{}", snake_to_camel(&field_name.to_string()));
+        let base_inner_type = extract_vec_inner_type(field_type).unwrap_or(field_type);
+            
+        let draft_inner_type = if is_nested {
+            let mut path = match base_inner_type {
+                syn::Type::Path(p) => p.clone(),
+                _ => return Err(Error::new_spanned(base_inner_type, "Nested blueprint type must be a path")),
+            };
+            let last_segment = path.path.segments.last_mut().unwrap();
+            last_segment.ident = format_ident!("{}Blueprint", last_segment.ident);
+            quote! { #path }
+        } else {
+            quote! { #base_inner_type }
+        };
+
+        // determine if the field acts like a Vec in both Draft and Final
+        let is_vec_field = extract_vec_inner_type(field_type).is_some();
+        let is_vec_in_both = slot_type == "vec" || (!is_slot && is_vec_field);
 
         if is_slot {
-            let base_inner_type = extract_vec_inner_type(field_type).unwrap_or(field_type);
-            
-            let draft_inner_type = if is_nested {
-                let mut path = match base_inner_type {
-                    syn::Type::Path(p) => p.clone(),
-                    _ => return Err(Error::new_spanned(base_inner_type, "Nested blueprint type must be a path")),
-                };
-                let last_segment = path.path.segments.last_mut().unwrap();
-                last_segment.ident = format_ident!("{}Blueprint", last_segment.ident);
-                quote! { #path }
-            } else {
-                quote! { #base_inner_type }
-            };
-
             match slot_type {
                 "vec" => {
-                    draft_fields.push(quote! { type #mode_type_name = Vec<blueprint::Slot<#draft_inner_type>>; });
-                    final_fields.push(quote! { type #mode_type_name = #field_type; });
+                    // It's a Vec in both. We'll use Vec<M::Item>
+                    draft_fields.push(quote! { type #mode_type_name = blueprint::Slot<#draft_inner_type>; });
+                    final_fields.push(quote! { type #mode_type_name = #base_inner_type; });
                     
                     complete_checks.push(quote! { self.#field_name.iter().all(|s| s.is_complete()) });
                     
@@ -139,14 +150,51 @@ pub fn generate_blueprint(item: ItemStruct) -> Result<proc_macro2::TokenStream, 
                 }
             }
         } else {
-            // Not a slot, so both modes use the base type
-            draft_fields.push(quote! { type #mode_type_name = #field_type; });
-            final_fields.push(quote! { type #mode_type_name = #field_type; });
+            if is_vec_field {
+                draft_fields.push(quote! { type #mode_type_name = #base_inner_type; });
+                final_fields.push(quote! { type #mode_type_name = #base_inner_type; });
+            } else {
+                draft_fields.push(quote! { type #mode_type_name = #field_type; });
+                final_fields.push(quote! { type #mode_type_name = #field_type; });
+            }
             
             resolve_fields.push(quote! { #field_name: self.#field_name });
         }
 
-        struct_fields.push(quote! { pub #field_name: M::#mode_type_name, });
+        if is_vec_in_both {
+            let fn_name = format_ident!("with_{}", field_name);
+            mutators.push(quote! {
+                pub fn #fn_name(&mut self, item: impl Into<<M as #mode_trait>::#mode_type_name>) {
+                    self.#field_name.push(item.into());
+                }
+            });
+            struct_fields.push(quote! {
+                #[cfg_attr(feature = "builders", builder(default, via_mutators))]
+                pub #field_name: Vec<<M as #mode_trait>::#mode_type_name>,
+            });
+        } else {
+            struct_fields.push(quote! {
+                #[cfg_attr(feature = "builders", builder(setter(into)))]
+                pub #field_name: <M as #mode_trait>::#mode_type_name,
+            });
+        }
+
+        if is_slot {
+            let choice_fn_name = format_ident!("add_{}_choice", field_name);
+            if slot_type == "vec" {
+                draft_methods.push(quote! {
+                    pub fn #choice_fn_name(&mut self, choice: blueprint::Choice<#draft_inner_type>) {
+                        self.#field_name.push(blueprint::Slot::Choose(choice));
+                    }
+                });
+            } else {
+                draft_methods.push(quote! {
+                    pub fn #choice_fn_name(&mut self, choice: blueprint::Choice<#draft_inner_type>) {
+                        self.#field_name = blueprint::Slot::Choose(choice);
+                    }
+                });
+            }
+        }
     }
 
     let is_complete_body = if complete_checks.is_empty() {
@@ -154,11 +202,6 @@ pub fn generate_blueprint(item: ItemStruct) -> Result<proc_macro2::TokenStream, 
     } else {
         quote! { #(#complete_checks)&&* }
     };
-
-    let mode_trait = format_ident!("{}Mode", name);
-    let draft_struct = format_ident!("{}Draft", name);
-    let final_struct = format_ident!("{}Final", name);
-    let blueprint_type = format_ident!("{}Blueprint", name);
 
     let mode_types: Vec<_> = fields.iter().map(|f| {
         let n = format_ident!("{}", snake_to_camel(&f.ident.as_ref().unwrap().to_string()));
@@ -186,8 +229,16 @@ pub fn generate_blueprint(item: ItemStruct) -> Result<proc_macro2::TokenStream, 
         pub type #blueprint_type = #name<#draft_struct>;
 
         #(#struct_attrs)*
+        #[cfg_attr(feature = "builders", derive(typed_builder::TypedBuilder))]
+        #[cfg_attr(feature = "builders", builder(mutators(
+            #(#mutators)*
+        )))]
         pub struct #name<M: #mode_trait = #final_struct> {
             #(#struct_fields)*
+        }
+
+        impl #name<#draft_struct> {
+            #(#draft_methods)*
         }
 
         impl blueprint::Blueprint for #blueprint_type {
@@ -221,7 +272,6 @@ pub fn generate_blueprint(item: ItemStruct) -> Result<proc_macro2::TokenStream, 
             {}
         }
         
-        // Dummy implementation of Walkable for any visitor until we implement actual walking
         impl<V> blueprint::Walkable<V> for #blueprint_type {
             fn walk_level(&mut self, _visitor: &mut V, _depth: usize) -> blueprint::Level {
                 blueprint::Level::continue_level(false)
