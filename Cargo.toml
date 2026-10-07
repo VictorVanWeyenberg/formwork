@@ -1,2 +1,2 @@
 [workspace]
-members = ["blueprint", "blueprint-macro"]
+members = ["schematic", "schematic-macro"]
