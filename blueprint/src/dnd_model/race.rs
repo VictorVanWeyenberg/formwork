@@ -2,8 +2,8 @@ use super::trait_def::{Trait, TraitDraft, TraitFinal};
 use crate::blueprint_trait::{Blueprint, Level, Walkable};
 use crate::choice::Choice;
 use crate::error::BlueprintError;
-use crate::slot::{Slot, SlotCollection};
-use crate::visitor::{ChoiceCollectionVisitor, ChoiceVisitor, VisitorFlow};
+use crate::slot::Slot;
+use crate::visitor::{ChoiceVisitor, VisitorFlow};
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
@@ -20,22 +20,12 @@ pub struct RaceFinal;
 
 impl RaceMode for RaceDraft {
     type TraitItem = Slot<Trait<TraitDraft>>;
-    type BonusSkills = SlotCollection<String>;
+    type BonusSkills = Slot<String>;
 }
 
 impl RaceMode for RaceFinal {
     type TraitItem = Trait<TraitFinal>;
     type BonusSkills = Vec<String>;
-}
-
-pub trait PushTraitChoice<M: RaceMode> {
-    fn push_choice(traits: &mut Vec<<M as RaceMode>::TraitItem>, choice: Choice<Trait<TraitDraft>>);
-}
-
-impl PushTraitChoice<RaceDraft> for RaceDraft {
-    fn push_choice(traits: &mut Vec<Slot<Trait<TraitDraft>>>, choice: Choice<Trait<TraitDraft>>) {
-        traits.push(Slot::Choose(choice));
-    }
 }
 
 pub type RaceBlueprint = Race<RaceDraft>;
@@ -44,12 +34,6 @@ pub type RaceBlueprint = Race<RaceDraft>;
 #[builder(mutators(
     pub fn with_trait(&mut self, trait_: impl Into<<M as RaceMode>::TraitItem>) {
         self.traits.push(trait_.into());
-    }
-    pub fn with_trait_choice(&mut self, choice: Choice<Trait<TraitDraft>>)
-    where
-        M: PushTraitChoice<M>,
-    {
-        M::push_choice(&mut self.traits, choice);
     }
 ))]
 #[serde(bound = "")]
@@ -72,7 +56,7 @@ impl Race<RaceDraft> {
         name: impl Into<String>,
         description: impl Into<String>,
         traits: I,
-        bonus_skills: impl Into<SlotCollection<String>>,
+        bonus_skills: impl Into<Slot<String>>,
     ) -> Self
     where
         I: IntoIterator<Item = T>,
@@ -86,18 +70,21 @@ impl Race<RaceDraft> {
             bonus_skills: bonus_skills.into(),
         }
     }
+
+    pub fn add_trait_choice(&mut self, choice: Choice<Trait<TraitDraft>>) {
+        self.traits.push(Slot::Choose(choice));
+    }
 }
 
 impl<V> Walkable<V> for Race<RaceDraft>
 where
-    V: ChoiceVisitor<Trait<TraitDraft>> + ChoiceCollectionVisitor<String>,
+    V: ChoiceVisitor<Trait<TraitDraft>> + ChoiceVisitor<String>,
     Trait<TraitDraft>: Walkable<V>,
 {
     fn walk_level(&mut self, visitor: &mut V, depth: usize) -> Level {
         if depth == 0 {
-            // --- Immediate choices at Race level ---
-            if let SlotCollection::Choose(choice) = &mut self.bonus_skills {
-                let flow = visitor.visit_choice_collection(choice);
+            if let Slot::Choose(choice) = &mut self.bonus_skills {
+                let flow = visitor.visit_choice(choice);
                 if flow != VisitorFlow::Continue {
                     return Level::from_flow(flow);
                 }
@@ -110,20 +97,26 @@ where
                     }
                 }
             }
-            let has_children = self.traits.iter().any(|t| t.selected_value().is_some());
-            Level::continue_level(has_children)
-        } else {
-            // --- Recurse into selected or fixed children at depth - 1 ---
-            let mut level = Level::continue_level(false);
+            
             for trait_slot in &mut self.traits {
-                if let Some(child_trait) = trait_slot.selected_value_mut() {
-                    level.combine(child_trait.walk_level(visitor, depth - 1));
-                    if level.flow == VisitorFlow::Break {
-                        return level;
+                for child_trait in trait_slot.as_fixed_mut().into_iter().flatten() {
+                    let flow = child_trait.walk_choices(visitor);
+                    if flow == VisitorFlow::Break {
+                        return Level::from_flow(flow);
+                    }
+                }
+                if let Some(choice) = trait_slot.as_choice_mut() {
+                    for child_trait in choice.selected_values_mut() {
+                        let flow = child_trait.walk_choices(visitor);
+                        if flow == VisitorFlow::Break {
+                            return Level::from_flow(flow);
+                        }
                     }
                 }
             }
-            level
+            Level::continue_level(false)
+        } else {
+            Level::continue_level(false)
         }
     }
 }
@@ -135,10 +128,7 @@ impl Blueprint for Race<RaceDraft> {
         self.bonus_skills.is_complete()
             && self.traits.iter().all(|slot| {
                 slot.is_complete()
-                    && slot
-                        .selected_value()
-                        .map(|t| t.is_complete())
-                        .unwrap_or(false)
+                    && slot.selected_values().iter().all(|t| t.is_complete())
             })
     }
 
@@ -146,9 +136,9 @@ impl Blueprint for Race<RaceDraft> {
         let bonus_skills = self.bonus_skills.resolve()?;
         let mut traits = Vec::with_capacity(self.traits.len());
         for slot in self.traits {
-            let trait_draft = slot.resolve()?;
-            let trait_final = trait_draft.resolve()?;
-            traits.push(trait_final);
+            for trait_draft in slot.resolve()? {
+                traits.push(trait_draft.resolve()?);
+            }
         }
 
         Ok(Race {
@@ -170,9 +160,9 @@ impl From<Race<RaceFinal>> for Race<RaceDraft> {
             traits: value
                 .traits
                 .into_iter()
-                .map(|t| Slot::Fixed(t.into()))
+                .map(|t| Slot::fixed(t.into()))
                 .collect(),
-            bonus_skills: SlotCollection::Fixed(value.bonus_skills),
+            bonus_skills: Slot::fixed_vec(value.bonus_skills),
         }
     }
 }

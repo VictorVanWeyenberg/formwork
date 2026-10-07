@@ -1,21 +1,19 @@
-use crate::cardinality::Cardinality;
-use crate::choice::Choice;
+use crate::choice::{Choice, Cardinality};
 use crate::error::BlueprintError;
 use serde::{Deserialize, Serialize};
 
-/// A single-value slot. Resolves to `T`.
-///
-/// Can be:
-/// - `Fixed(T)`: Finalized value, no choice required.
-/// - `Choose(Choice<T>)`: A choice slot that holds choice state (`selected_index`, `is_made`, `history`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Slot<T> {
-    Fixed(T),
+    Fixed(Vec<T>),
     Choose(Choice<T>),
 }
 
 impl<T> Slot<T> {
     pub fn fixed(value: T) -> Self {
+        Slot::Fixed(vec![value])
+    }
+
+    pub fn fixed_vec(value: Vec<T>) -> Self {
         Slot::Fixed(value)
     }
 
@@ -23,7 +21,6 @@ impl<T> Slot<T> {
         Slot::Choose(choice)
     }
 
-    /// Alias for backwards compatibility.
     pub fn pending(choice: Choice<T>) -> Self {
         Slot::Choose(choice)
     }
@@ -53,14 +50,14 @@ impl<T> Slot<T> {
         }
     }
 
-    pub fn as_fixed(&self) -> Option<&T> {
+    pub fn as_fixed(&self) -> Option<&[T]> {
         match self {
-            Slot::Fixed(v) => Some(v),
+            Slot::Fixed(v) => Some(v.as_slice()),
             _ => None,
         }
     }
 
-    pub fn as_fixed_mut(&mut self) -> Option<&mut T> {
+    pub fn as_fixed_mut(&mut self) -> Option<&mut Vec<T>> {
         match self {
             Slot::Fixed(v) => Some(v),
             _ => None,
@@ -81,17 +78,17 @@ impl<T> Slot<T> {
         }
     }
 
-    pub fn selected_value(&self) -> Option<&T> {
+    pub fn selected_values(&self) -> Vec<&T> {
         match self {
-            Slot::Fixed(v) => Some(v),
-            Slot::Choose(c) => c.selected_value(),
+            Slot::Fixed(v) => v.iter().collect(),
+            Slot::Choose(c) => c.selected_values(),
         }
     }
 
-    pub fn selected_value_mut(&mut self) -> Option<&mut T> {
+    pub fn selected_values_mut(&mut self) -> Vec<&mut T> {
         match self {
-            Slot::Fixed(v) => Some(v),
-            Slot::Choose(c) => c.selected_value_mut(),
+            Slot::Fixed(v) => v.iter_mut().collect(),
+            Slot::Choose(c) => c.selected_values_mut(),
         }
     }
 
@@ -103,7 +100,10 @@ impl<T> Slot<T> {
     }
 
     pub fn cardinality(&self) -> Cardinality {
-        Cardinality::ONE
+        match self {
+            Slot::Fixed(v) => Cardinality::Exact(v.len()),
+            Slot::Choose(c) => c.cardinality,
+        }
     }
 
     pub fn option_labels(&self) -> Vec<&str> {
@@ -113,20 +113,12 @@ impl<T> Slot<T> {
         }
     }
 
-    pub fn selected_index(&self) -> Option<usize> {
-        match self {
-            Slot::Fixed(_) => None,
-            Slot::Choose(c) => c.selected_index(),
-        }
-    }
-
     pub fn selected_indices(&self) -> &[usize] {
         match self {
             Slot::Fixed(_) => &[],
             Slot::Choose(c) => c.selected_indices(),
         }
     }
-
 
     pub fn select(&mut self, index: usize) -> Result<(), BlueprintError> {
         match self {
@@ -149,8 +141,7 @@ impl<T> Slot<T> {
         }
     }
 
-    /// Resolves the slot to its final value `T`.
-    pub fn resolve(self) -> Result<T, BlueprintError> {
+    pub fn resolve(self) -> Result<Vec<T>, BlueprintError> {
         match self {
             Slot::Fixed(value) => Ok(value),
             Slot::Choose(choice) => choice.resolve(),
@@ -160,12 +151,24 @@ impl<T> Slot<T> {
 
 impl<T> From<T> for Slot<T> {
     fn from(value: T) -> Self {
-        Slot::Fixed(value)
+        Slot::fixed(value)
+    }
+}
+
+impl<T> From<Vec<T>> for Slot<T> {
+    fn from(value: Vec<T>) -> Self {
+        Slot::fixed_vec(value)
     }
 }
 
 impl<T> From<Choice<T>> for Slot<T> {
     fn from(choice: Choice<T>) -> Self {
         Slot::Choose(choice)
+    }
+}
+
+impl<T> Default for Slot<T> {
+    fn default() -> Self {
+        Slot::Fixed(Vec::new())
     }
 }

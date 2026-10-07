@@ -135,20 +135,20 @@ where
                     }
                 }
             }
-            let has_children = self.primary_branch.selected_value().is_some()
-                || self.branches.iter().any(|b| b.selected_value().is_some());
+            let has_children = !self.primary_branch.selected_values().is_empty()
+                || self.branches.iter().any(|b| !b.selected_values().is_empty());
             Level::continue_level(has_children)
         } else {
             // --- Recurse into selected or fixed children at depth - 1 ---
             let mut level = Level::continue_level(false);
-            if let Some(child) = self.primary_branch.selected_value_mut() {
+            for child in self.primary_branch.selected_values_mut() {
                 level.combine(child.walk_level(visitor, depth - 1));
                 if level.flow == VisitorFlow::Break {
                     return level;
                 }
             }
             for branch_slot in &mut self.branches {
-                if let Some(child) = branch_slot.selected_value_mut() {
+                for child in branch_slot.selected_values_mut() {
                     level.combine(child.walk_level(visitor, depth - 1));
                     if level.flow == VisitorFlow::Break {
                         return level;
@@ -167,28 +167,27 @@ impl Blueprint for Root<RootDraft> {
         let primary_ok = self.primary_branch.is_complete()
             && self
                 .primary_branch
-                .selected_value()
-                .map(|b| b.is_complete())
-                .unwrap_or(false);
+                .selected_values()
+                .iter().all(|b| b.is_complete());
+                
         let branches_ok = self.branches.iter().all(|slot| {
             slot.is_complete()
                 && slot
-                    .selected_value()
-                    .map(|b| b.is_complete())
-                    .unwrap_or(false)
+                    .selected_values()
+                    .iter().all(|b| b.is_complete())
         });
         primary_ok && branches_ok
     }
 
     fn resolve(self) -> Result<Self::Final, BlueprintError> {
-        let primary_draft = self.primary_branch.resolve()?;
-        let primary_final = primary_draft.resolve()?;
+        let mut primary_drafts = self.primary_branch.resolve()?;
+        let primary_final = primary_drafts.pop().unwrap().resolve()?;
 
         let mut branches_final = Vec::with_capacity(self.branches.len());
         for slot in self.branches {
-            let draft = slot.resolve()?;
-            let final_b = draft.resolve()?;
-            branches_final.push(final_b);
+            for draft in slot.resolve()? {
+            branches_final.push(draft.resolve()?);
+            }
         }
 
         Ok(Root {
@@ -204,11 +203,11 @@ impl From<Root<RootFinal>> for Root<RootDraft> {
     fn from(value: Root<RootFinal>) -> Self {
         Root {
             id: value.id,
-            primary_branch: Slot::Fixed(value.primary_branch.into()),
+            primary_branch: Slot::fixed(value.primary_branch.into()),
             branches: value
                 .branches
                 .into_iter()
-                .map(|b| Slot::Fixed(b.into()))
+                .map(|b| Slot::fixed(b.into()))
                 .collect(),
         }
     }

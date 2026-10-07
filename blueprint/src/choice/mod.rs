@@ -1,7 +1,5 @@
-mod collection;
+mod choice;
 mod option;
-mod scalar;
 
-pub use collection::ChoiceCollection;
+pub use choice::{Choice, ChoiceState, Cardinality};
 pub use option::ChoiceOption;
-pub use scalar::Choice;

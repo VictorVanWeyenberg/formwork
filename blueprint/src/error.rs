@@ -1,4 +1,4 @@
-use crate::cardinality::Cardinality;
+use crate::choice::Cardinality;
 use thiserror::Error;
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]

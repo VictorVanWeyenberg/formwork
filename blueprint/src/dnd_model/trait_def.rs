@@ -108,7 +108,7 @@ impl Blueprint for Trait<TraitDraft> {
     fn resolve(self) -> Result<Self::Final, BlueprintError> {
         let mut effects = Vec::with_capacity(self.effects.len());
         for slot in self.effects {
-            effects.push(slot.resolve()?);
+            effects.extend(slot.resolve()?);
         }
         Ok(Trait {
             title: self.title,
@@ -123,7 +123,7 @@ impl From<Trait<TraitFinal>> for Trait<TraitDraft> {
         Trait {
             title: value.title,
             description: value.description,
-            effects: value.effects.into_iter().map(Slot::Fixed).collect(),
+            effects: value.effects.into_iter().map(Slot::fixed).collect(),
         }
     }
 }

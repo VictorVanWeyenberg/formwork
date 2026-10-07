@@ -1,5 +1,5 @@
 use crate::error::BlueprintError;
-use crate::visitor::{ConfirmAll, Counter, TargetUnmaker, UnmakeAll, VisitorFlow};
+use crate::visitor::{ConfirmAll, UnmakeAll, VisitorFlow};
 
 /// Status and continuation signal for a single level in depth-limited BFS traversal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,13 +23,6 @@ impl Level {
         }
     }
 
-    pub fn back_level() -> Self {
-        Self {
-            flow: VisitorFlow::Back,
-            deeper: false,
-        }
-    }
-
     pub fn from_flow(flow: VisitorFlow) -> Self {
         Self {
             flow,
@@ -38,9 +31,7 @@ impl Level {
     }
 
     pub fn combine(&mut self, other: Level) {
-        if other.flow == VisitorFlow::Back {
-            self.flow = VisitorFlow::Back;
-        } else if other.flow == VisitorFlow::Break && self.flow != VisitorFlow::Back {
+        if other.flow == VisitorFlow::Break {
             self.flow = VisitorFlow::Break;
         }
         if other.deeper {
@@ -66,42 +57,15 @@ pub trait Blueprint: Sized {
     fn resolve(self) -> Result<Self::Final, BlueprintError>;
 
     /// Traverses choices in the blueprint breadth-first, invoking `visitor` on each choice.
-    /// If the visitor returns `VisitorFlow::Back`, the traversal will automatically
-    /// find and unmake the last choice that was made in the entire blueprint.
     fn walk_choices<V>(&mut self, visitor: &mut V) -> VisitorFlow
     where
-        Self: Walkable<V> + Walkable<Counter> + Walkable<TargetUnmaker>,
+        Self: Walkable<V>,
     {
         let mut depth = 0;
         loop {
             let level = self.walk_level(visitor, depth);
             if level.flow == VisitorFlow::Break {
                 return VisitorFlow::Break;
-            }
-            if level.flow == VisitorFlow::Back {
-                // Stepping back requested: unmake the globally last made choice.
-                let mut counter = Counter::default();
-                let mut d = 0;
-                loop {
-                    let l = self.walk_level(&mut counter, d);
-                    if !l.deeper || l.flow != VisitorFlow::Continue {
-                        break;
-                    }
-                    d += 1;
-                }
-
-                if counter.count > 0 {
-                    let mut unmaker = TargetUnmaker::new(counter.count);
-                    let mut d = 0;
-                    loop {
-                        let l = self.walk_level(&mut unmaker, d);
-                        if l.flow == VisitorFlow::Break || !l.deeper {
-                            break;
-                        }
-                        d += 1;
-                    }
-                }
-                return VisitorFlow::Back;
             }
             if !level.deeper {
                 return VisitorFlow::Continue;
@@ -113,7 +77,7 @@ pub trait Blueprint: Sized {
     /// Reverts all made choices in the blueprint back to pending, preserving history.
     fn unmake_all(&mut self)
     where
-        Self: Walkable<UnmakeAll> + Walkable<Counter> + Walkable<TargetUnmaker>,
+        Self: Walkable<UnmakeAll>,
     {
         let mut unmaker = UnmakeAll;
         self.walk_choices(&mut unmaker);
@@ -122,7 +86,7 @@ pub trait Blueprint: Sized {
     /// Re-confirms all unmade choices that have an existing selection history.
     fn confirm_all(&mut self)
     where
-        Self: Walkable<ConfirmAll> + Walkable<Counter> + Walkable<TargetUnmaker>,
+        Self: Walkable<ConfirmAll>,
     {
         let mut confirmer = ConfirmAll;
         self.walk_choices(&mut confirmer);

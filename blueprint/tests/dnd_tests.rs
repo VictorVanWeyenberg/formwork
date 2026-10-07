@@ -1,8 +1,8 @@
-use blueprint::choice::{Choice, ChoiceCollection};
+use blueprint::choice::Choice;
 use blueprint::dnd_model::*;
 use blueprint::visitor::{
-    AutoSelectFirst, ChoiceCollectionVisitor, ChoiceVisitor,
-    VisitorFlow, StepBack,
+    AutoSelectFirst, ChoiceVisitor,
+    VisitorFlow, UnmakeAll,
 };
 use blueprint::Blueprint;
 
@@ -27,10 +27,10 @@ impl ChoiceVisitor<Trait<TraitDraft>> for ToolSelector {
     }
 }
 
-impl ChoiceCollectionVisitor<String> for ToolSelector {
-    fn visit_choice_collection(
+impl ChoiceVisitor<String> for ToolSelector {
+    fn visit_choice(
         &mut self,
-        _choice: &mut ChoiceCollection<String>,
+        _choice: &mut Choice<String>,
     ) -> VisitorFlow {
         VisitorFlow::Continue
     }
@@ -52,10 +52,10 @@ impl ChoiceVisitor<Trait<TraitDraft>> for PromptCollector {
     }
 }
 
-impl ChoiceCollectionVisitor<String> for PromptCollector {
-    fn visit_choice_collection(
+impl ChoiceVisitor<String> for PromptCollector {
+    fn visit_choice(
         &mut self,
-        choice: &mut ChoiceCollection<String>,
+        choice: &mut Choice<String>,
     ) -> VisitorFlow {
         self.0.push(choice.prompt().to_string());
         VisitorFlow::Continue
@@ -133,8 +133,8 @@ fn test_dwarf_unmake_choice_and_reselect() {
     dwarf.walk_choices(&mut selector);
     assert!(dwarf.is_complete());
 
-    // Unmake the choice via walk_choices(&mut StepBack) == VisitorFlow::Back
-    let unmade = dwarf.walk_choices(&mut StepBack) == VisitorFlow::Back;
+    // Unmake the choice via walk_choices(&mut UnmakeAll) == VisitorFlow::Continue
+    let unmade = dwarf.walk_choices(&mut UnmakeAll) == VisitorFlow::Continue;
     assert!(unmade);
     assert!(!dwarf.is_complete());
 
@@ -157,8 +157,8 @@ fn test_dwarf_unmake_choice_and_reselect() {
             VisitorFlow::Continue
         }
     }
-    impl ChoiceCollectionVisitor<String> for HistoryInspector {
-        fn visit_choice_collection(&mut self, _c: &mut ChoiceCollection<String>) -> VisitorFlow {
+    impl ChoiceVisitor<String> for HistoryInspector {
+        fn visit_choice(&mut self, _choice: &mut Choice<String>) -> VisitorFlow {
             VisitorFlow::Continue
         }
     }
@@ -271,7 +271,7 @@ fn test_typed_builder_dnd_draft_with_choices() {
                 .with_effect(Effect::darkvision(60))
                 .build(),
         )
-        .with_trait_choice(trait_choice)
+        .with_trait(trait_choice)
         .build();
 
     assert_eq!(race_blueprint.traits.len(), 2);

@@ -2,8 +2,8 @@ use super::leaf::Leaf;
 use crate::blueprint_trait::{Blueprint, Level, Walkable};
 use crate::choice::Choice;
 use crate::error::BlueprintError;
-use crate::slot::{Slot, SlotCollection};
-use crate::visitor::{ChoiceCollectionVisitor, ChoiceVisitor, VisitorFlow};
+use crate::slot::{Slot};
+use crate::visitor::{ChoiceVisitor, VisitorFlow};
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
@@ -20,7 +20,7 @@ pub struct BranchFinal;
 
 impl BranchMode for BranchDraft {
     type LeafItem = Slot<Leaf>;
-    type Tags = SlotCollection<String>;
+    type Tags = Slot<String>;
 }
 
 impl BranchMode for BranchFinal {
@@ -94,7 +94,7 @@ impl Branch<BranchDraft> {
     pub fn draft(
         name: impl Into<String>,
         leaves: impl IntoIterator<Item = Slot<Leaf>>,
-        tags: impl Into<SlotCollection<String>>,
+        tags: impl Into<Slot<String>>,
     ) -> Self {
         Self {
             name: name.into(),
@@ -106,7 +106,7 @@ impl Branch<BranchDraft> {
 
 impl<V> Walkable<V> for Branch<BranchDraft>
 where
-    V: ChoiceVisitor<Leaf> + ChoiceCollectionVisitor<String>,
+    V: ChoiceVisitor<Leaf> + ChoiceVisitor<String>,
 {
     fn walk_level(&mut self, visitor: &mut V, depth: usize) -> Level {
         if depth == 0 {
@@ -118,8 +118,8 @@ where
                     }
                 }
             }
-            if let SlotCollection::Choose(choice) = &mut self.tags {
-                let flow = visitor.visit_choice_collection(choice);
+            if let Slot::Choose(choice) = &mut self.tags {
+                let flow = visitor.visit_choice(choice);
                 if flow != VisitorFlow::Continue {
                     return Level::from_flow(flow);
                 }
@@ -141,7 +141,7 @@ impl Blueprint for Branch<BranchDraft> {
     fn resolve(self) -> Result<Self::Final, BlueprintError> {
         let mut leaves = Vec::with_capacity(self.leaves.len());
         for slot in self.leaves {
-            leaves.push(slot.resolve()?);
+            leaves.extend(slot.resolve()?);
         }
         let tags = self.tags.resolve()?;
         Ok(Branch {
@@ -157,8 +157,8 @@ impl From<Branch<BranchFinal>> for Branch<BranchDraft> {
     fn from(value: Branch<BranchFinal>) -> Self {
         Branch {
             name: value.name,
-            leaves: value.leaves.into_iter().map(Slot::Fixed).collect(),
-            tags: SlotCollection::Fixed(value.tags),
+            leaves: value.leaves.into_iter().map(Slot::fixed).collect(),
+            tags: Slot::fixed_vec(value.tags),
         }
     }
 }

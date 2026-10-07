@@ -2,7 +2,7 @@ use super::effect::Effect;
 use super::race::{Race, RaceBlueprint, RaceDraft};
 use super::trait_def::{Trait, TraitDraft};
 use crate::choice::{Choice, ChoiceOption};
-use crate::slot::{Slot, SlotCollection};
+use crate::slot::{Slot};
 
 /// Constructs the D&D 5e Dwarf race blueprint.
 /// All racial traits are fixed except for Tool Proficiency, which requires a choice.
@@ -10,29 +10,29 @@ pub fn dwarf_blueprint() -> RaceBlueprint {
     let asi = Trait::<TraitDraft>::draft(
         "Ability Score Increase",
         "Your Constitution score increases by 2.",
-        vec![Slot::Fixed(Effect::ability_bonus("Constitution", 2))],
+        vec![Slot::fixed(Effect::ability_bonus("Constitution", 2))],
     );
 
     let darkvision = Trait::<TraitDraft>::draft(
         "Darkvision",
         "You can see in dim light within 60 feet of you as if it were bright light.",
-        vec![Slot::Fixed(Effect::darkvision(60))],
+        vec![Slot::fixed(Effect::darkvision(60))],
     );
 
     let dwarven_resilience = Trait::<TraitDraft>::draft(
         "Dwarven Resilience",
         "You have advantage on saving throws against poison, and you have resistance against poison damage.",
-        vec![Slot::Fixed(Effect::resistance("Poison"))],
+        vec![Slot::fixed(Effect::resistance("Poison"))],
     );
 
     let dwarven_combat_training = Trait::<TraitDraft>::draft(
         "Dwarven Combat Training",
         "You have proficiency with the battleaxe, handaxe, light hammer, and warhammer.",
         vec![
-            Slot::Fixed(Effect::proficiency("Battleaxe")),
-            Slot::Fixed(Effect::proficiency("Handaxe")),
-            Slot::Fixed(Effect::proficiency("Light hammer")),
-            Slot::Fixed(Effect::proficiency("Warhammer")),
+            Slot::fixed(Effect::proficiency("Battleaxe")),
+            Slot::fixed(Effect::proficiency("Handaxe")),
+            Slot::fixed(Effect::proficiency("Light hammer")),
+            Slot::fixed(Effect::proficiency("Warhammer")),
         ],
     );
 
@@ -57,12 +57,12 @@ pub fn dwarf_blueprint() -> RaceBlueprint {
         "Dwarf",
         "Bold and hardy, dwarves are known as skilled warriors, miners, and workers of stone and metal.",
         vec![
-            Slot::Fixed(asi),
-            Slot::Fixed(darkvision),
-            Slot::Fixed(dwarven_resilience),
-            Slot::Fixed(dwarven_combat_training),
-            Slot::Fixed(tool_proficiency),
+            Slot::fixed(asi),
+            Slot::fixed(darkvision),
+            Slot::fixed(dwarven_resilience),
+            Slot::fixed(dwarven_combat_training),
+            Slot::fixed(tool_proficiency),
         ],
-        SlotCollection::Fixed(vec![]),
+        Slot::fixed_vec(vec![]),
     )
 }

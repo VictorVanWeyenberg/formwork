@@ -1,11 +1,11 @@
 use blueprint::abstract_model::*;
-use blueprint::cardinality::Cardinality;
-use blueprint::choice::{Choice, ChoiceCollection, ChoiceOption};
+use blueprint::choice::Cardinality;
+use blueprint::choice::{Choice, ChoiceOption};
 use blueprint::error::BlueprintError;
-use blueprint::slot::{Slot, SlotCollection};
+use blueprint::slot::Slot;
 use blueprint::visitor::{
-    AutoSelectFirst, ChoiceCollectionVisitor, ChoiceVisitor,
-    VisitorFlow, StepBack,
+    AutoSelectFirst, ChoiceVisitor,
+    VisitorFlow, UnmakeAll,
 };
 use blueprint::Blueprint;
 
@@ -65,10 +65,10 @@ impl ChoiceVisitor<Leaf> for LeafPicker {
     }
 }
 
-impl ChoiceCollectionVisitor<String> for LeafPicker {
-    fn visit_choice_collection(
+impl ChoiceVisitor<String> for LeafPicker {
+    fn visit_choice(
         &mut self,
-        _choice: &mut ChoiceCollection<String>,
+        _choice: &mut Choice<String>,
     ) -> VisitorFlow {
         VisitorFlow::Continue
     }
@@ -105,20 +105,20 @@ fn test_scalar_choice_selection_and_resolution() {
 
 #[test]
 fn test_collection_slot_cardinality_and_validation() {
-    let tag_choice = ChoiceCollection::new(
+    let tag_choice = Choice::new(
         "Pick exactly 2 tags:",
-        Cardinality::Exact(2),
         vec![
             ChoiceOption::new("alpha", "alpha".to_string()),
             ChoiceOption::new("beta", "beta".to_string()),
             ChoiceOption::new("gamma", "gamma".to_string()),
         ],
-    );
+    ).with_cardinality(Cardinality::Exact(2));
 
-    let mut slot = SlotCollection::pending(tag_choice);
+    let mut slot = Slot::Choose(tag_choice);
 
     // Try selecting 1 option when 2 are required
-    let err = slot.select(&[0]).unwrap_err();
+    slot.select(0).unwrap();
+    let err = slot.confirm().unwrap_err();
     match err {
         BlueprintError::InvalidCardinality { expected, actual, .. } => {
             assert_eq!(expected, Cardinality::Exact(2));
@@ -128,15 +128,15 @@ fn test_collection_slot_cardinality_and_validation() {
     }
 
     // Try duplicate selection
-    let err = slot.select(&[0, 0]).unwrap_err();
+    let err = slot.select(0).unwrap_err();
     assert!(matches!(err, BlueprintError::DuplicateSelection { .. }));
 
     // Try out of bounds selection
-    let err = slot.select(&[0, 5]).unwrap_err();
+    let err = slot.select(5).unwrap_err();
     assert!(matches!(err, BlueprintError::IndexOutOfBounds { .. }));
 
     // Valid selection: options 0 and 2 ("alpha", "gamma")
-    slot.select(&[0, 2]).unwrap();
+    slot.select(2).unwrap();
     assert!(slot.is_made());
 
     let resolved = slot.resolve().unwrap();
@@ -165,7 +165,7 @@ fn test_unmake_choice_preserves_selection() {
     assert!(branch.is_complete());
 
     // 2. Unmake choice via step-back
-    let unmade = branch.walk_choices(&mut StepBack) == VisitorFlow::Back;
+    let unmade = branch.walk_choices(&mut UnmakeAll) == VisitorFlow::Continue;
     assert!(unmade);
 
     // 3. Choice is now pending again, but previous selection is preserved!
@@ -184,10 +184,10 @@ fn test_unmake_choice_preserves_selection() {
             VisitorFlow::Break
         }
     }
-    impl ChoiceCollectionVisitor<String> for HistoryChecker {
-        fn visit_choice_collection(
+    impl ChoiceVisitor<String> for HistoryChecker {
+        fn visit_choice(
             &mut self,
-            _choice: &mut ChoiceCollection<String>,
+            _choice: &mut Choice<String>,
         ) -> VisitorFlow {
             VisitorFlow::Continue
         }
@@ -249,10 +249,10 @@ fn test_transitive_blueprint_and_progressive_disclosure() {
             VisitorFlow::Continue
         }
     }
-    impl ChoiceCollectionVisitor<String> for PromptRecorder {
-        fn visit_choice_collection(
+    impl ChoiceVisitor<String> for PromptRecorder {
+        fn visit_choice(
             &mut self,
-            choice: &mut ChoiceCollection<String>,
+            choice: &mut Choice<String>,
         ) -> VisitorFlow {
             self.prompts.push(choice.prompt().to_string());
             VisitorFlow::Continue
@@ -276,8 +276,8 @@ fn test_transitive_blueprint_and_progressive_disclosure() {
             VisitorFlow::Continue
         }
     }
-    impl ChoiceCollectionVisitor<String> for BranchSelect {
-        fn visit_choice_collection(&mut self, _c: &mut ChoiceCollection<String>) -> VisitorFlow {
+    impl ChoiceVisitor<String> for BranchSelect {
+        fn visit_choice(&mut self, _choice: &mut Choice<String>) -> VisitorFlow {
             VisitorFlow::Continue
         }
     }
@@ -305,8 +305,8 @@ fn test_transitive_blueprint_and_progressive_disclosure() {
             VisitorFlow::Break
         }
     }
-    impl ChoiceCollectionVisitor<String> for LeafSelect {
-        fn visit_choice_collection(&mut self, _c: &mut ChoiceCollection<String>) -> VisitorFlow {
+    impl ChoiceVisitor<String> for LeafSelect {
+        fn visit_choice(&mut self, _choice: &mut Choice<String>) -> VisitorFlow {
             VisitorFlow::Continue
         }
     }
@@ -362,8 +362,8 @@ fn test_breadth_first_traversal_order() {
             VisitorFlow::Continue
         }
     }
-    impl ChoiceCollectionVisitor<String> for PromptRecorder {
-        fn visit_choice_collection(&mut self, choice: &mut ChoiceCollection<String>) -> VisitorFlow {
+    impl ChoiceVisitor<String> for PromptRecorder {
+        fn visit_choice(&mut self, choice: &mut Choice<String>) -> VisitorFlow {
             self.0.push(choice.prompt().to_string());
             VisitorFlow::Continue
         }
@@ -444,40 +444,37 @@ fn test_choice_serialization_minimal_footprint() {
 
     // Deserialization from minimal JSON initializes defaults
     let minimal_scalar: Choice<i32> = serde_json::from_str(r#"{"prompt":"Test","options":[]}"#).unwrap();
-    assert_eq!(minimal_scalar.selected_index, None);
-    assert!(!minimal_scalar.is_made);
+    assert_eq!(minimal_scalar.selected_index(), None);
+    assert!(!minimal_scalar.is_made());
 
     // 2. Collection choice fresh state
-    let coll_choice = ChoiceCollection::new(
+    let coll_choice = Choice::new(
         "Pick some",
-        Cardinality::AtLeast(1),
         vec![ChoiceOption::new("X", "x".to_string())],
-    );
+    ).with_cardinality(Cardinality::AtLeast(1));
     let coll_json = serde_json::to_string(&coll_choice).unwrap();
     assert!(!coll_json.contains("selected_indices"));
     assert!(!coll_json.contains("is_made"));
 
     // Deserialization from minimal JSON initializes defaults
-    let minimal_coll: ChoiceCollection<String> =
-        serde_json::from_str(r#"{"prompt":"Test","cardinality":{"exact":1},"options":[]}"#).unwrap();
-    assert!(minimal_coll.selected_indices.is_empty());
-    assert!(!minimal_coll.is_made);
+    let minimal_coll: Choice<String> =
+        serde_json::from_str(r#"{"prompt":"Test","cardinality":{"Exact":1},"options":[]}"#).unwrap();
+    assert!(minimal_coll.selected_indices().is_empty());
+    assert!(!minimal_coll.is_made());
 
     // 3. Made vs Unmade serialization
     let mut made_scalar = scalar_choice;
     made_scalar.select(1).unwrap();
     let made_json = serde_json::to_string(&made_scalar).unwrap();
-    assert!(made_json.contains(r#""selected_index":1"#));
-    assert!(made_json.contains(r#""is_made":true"#));
+    assert!(made_json.contains(r#""state":{"Made":[1]}"#));
 
     made_scalar.unmake().unwrap();
     let unmade_json = serde_json::to_string(&made_scalar).unwrap();
-    assert!(unmade_json.contains(r#""selected_index":1"#));
-    assert!(!unmade_json.contains("is_made"), "is_made: false must be omitted");
+    assert!(unmade_json.contains(r#""state":{"UnmadeWithHistory":[1]}"#));
 
     let roundtripped_unmade: Choice<i32> = serde_json::from_str(&unmade_json).unwrap();
-    assert!(!roundtripped_unmade.is_made, "omitted is_made deserializes as false");
-    assert_eq!(roundtripped_unmade.selected_index, Some(1));
+    assert!(!roundtripped_unmade.is_made(), "omitted state deserializes as UnmadeWithHistory");
+    assert_eq!(roundtripped_unmade.selected_index(), Some(1));
 }
 
 #[test]
@@ -577,15 +574,14 @@ fn test_scalar_slot_cannot_have_cardinality_discrepancy() {
     let slot = Slot::pending(scalar_choice);
     assert_eq!(slot.cardinality(), Cardinality::Exact(1));
 
-    let collection_choice = ChoiceCollection::new(
+    let collection_choice = Choice::new(
         "Pick up to 2 tags:",
-        Cardinality::UpTo(2),
         vec![
             ChoiceOption::new("t1", "t1".to_string()),
             ChoiceOption::new("t2", "t2".to_string()),
         ],
-    );
-    let collection_slot = SlotCollection::pending(collection_choice);
+    ).with_cardinality(Cardinality::UpTo(2));
+    let collection_slot = Slot::Choose(collection_choice);
     assert_eq!(collection_slot.cardinality(), Cardinality::UpTo(2));
 }
 
@@ -623,13 +619,13 @@ impl ChoiceVisitor<Branch<BranchDraft>> for TypedWizardUI {
     }
 }
 
-impl ChoiceCollectionVisitor<String> for TypedWizardUI {
-    fn visit_choice_collection(
+impl ChoiceVisitor<String> for TypedWizardUI {
+    fn visit_choice(
         &mut self,
-        choice: &mut ChoiceCollection<String>,
+        choice: &mut Choice<String>,
     ) -> VisitorFlow {
         self.tag_choices_visited += 1;
-        choice.select(&[0]).unwrap();
+        choice.select(0).unwrap();
         VisitorFlow::Continue
     }
 }
@@ -640,16 +636,15 @@ fn test_strongly_typed_multi_impl_visitor() {
         "Pick a leaf",
         vec![ChoiceOption::new("L1", Leaf::new("Leaf1", 10))],
     );
-    let tag_choice = ChoiceCollection::new(
+    let tag_choice = Choice::new(
         "Pick tags",
-        Cardinality::ONE,
         vec![ChoiceOption::new("t1", "Tag1".to_string())],
-    );
+    ).with_cardinality(Cardinality::ONE);
 
     let branch = BranchBlueprint {
         name: "Branch 1".into(),
         leaves: vec![Slot::pending(leaf_choice)],
-        tags: SlotCollection::pending(tag_choice),
+        tags: Slot::Choose(tag_choice),
     };
 
     let branch_choice = Choice::new("Pick branch", vec![ChoiceOption::new("B1", branch)]);
@@ -691,7 +686,7 @@ fn test_step_back_navigation_with_selection_preservation() {
     let branch = BranchBlueprint {
         name: "Branch 1".into(),
         leaves: vec![Slot::pending(leaf_choice)],
-        tags: SlotCollection::Fixed(vec![]),
+        tags: Slot::Fixed(vec![]),
     };
 
     let branch_choice = Choice::new(
@@ -712,7 +707,7 @@ fn test_step_back_navigation_with_selection_preservation() {
     assert!(root.is_complete());
 
     // 2. Step back choice 1 (the leaf choice, which is at level 1)
-    let unmade1 = root.walk_choices(&mut StepBack) == VisitorFlow::Back;
+    let unmade1 = root.walk_choices(&mut UnmakeAll) == VisitorFlow::Continue;
     assert!(unmade1);
     assert!(!root.is_complete());
 
@@ -733,8 +728,8 @@ fn test_step_back_navigation_with_selection_preservation() {
             VisitorFlow::Continue
         }
     }
-    impl ChoiceCollectionVisitor<String> for CheckSelection {
-        fn visit_choice_collection(&mut self, _c: &mut ChoiceCollection<String>) -> VisitorFlow {
+    impl ChoiceVisitor<String> for CheckSelection {
+        fn visit_choice(&mut self, _choice: &mut Choice<String>) -> VisitorFlow {
             VisitorFlow::Continue
         }
     }
@@ -745,7 +740,7 @@ fn test_step_back_navigation_with_selection_preservation() {
     assert_eq!(check.leaf_selected, Some(0), "previous choice must be pre-selected");
 
     // 3. Step back choice 2 (the branch choice, which is at level 0)
-    let unmade2 = root.walk_choices(&mut StepBack) == VisitorFlow::Back;
+    let unmade2 = root.walk_choices(&mut UnmakeAll) == VisitorFlow::Continue;
     assert!(unmade2);
 
     // 4. No more choices to unmake
