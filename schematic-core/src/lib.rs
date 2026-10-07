@@ -13,8 +13,6 @@ pub mod error;
 pub mod visitor;
 pub mod slot;
 pub mod schematic_trait;
-pub mod abstract_model;
-pub mod dnd_model;
 
 
 pub use choice::{Choice, ChoiceState, Cardinality};
