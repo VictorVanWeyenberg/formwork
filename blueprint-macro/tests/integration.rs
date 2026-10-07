@@ -145,15 +145,13 @@ fn test_nested_choice() {
 #[cfg(feature = "builders")]
 fn test_builders() {
     let mut draft: RootBlueprint = Root::builder()
-        .leaf(blueprint::Slot::Fixed("hi".to_string()))
-        .with_dwarf_traits(blueprint::Slot::Fixed("trait1".to_string()))
-        .class_skills(blueprint::Slot::Choose(
-            blueprint::Choice::new("Pick skills", vec![
-                blueprint::ChoiceOption::new("A", "A".to_string()),
-                blueprint::ChoiceOption::new("B", "B".to_string()),
-                blueprint::ChoiceOption::new("C", "C".to_string()),
-            ]).with_cardinality(blueprint::Cardinality::Exact(2))
-        ))
+        .leaf("hi".to_string())
+        .with_dwarf_traits("trait1".to_string())
+        .class_skills(blueprint::Choice::new("Pick skills", vec![
+            blueprint::ChoiceOption::new("A", "A".to_string()),
+            blueprint::ChoiceOption::new("B", "B".to_string()),
+            blueprint::ChoiceOption::new("C", "C".to_string()),
+        ]).with_cardinality(blueprint::Cardinality::Exact(2)))
         .build();
 
     // Now test draft methods generated on the struct
