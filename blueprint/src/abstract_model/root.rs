@@ -180,8 +180,7 @@ impl Blueprint for Root<RootDraft> {
     }
 
     fn resolve(self) -> Result<Self::Final, BlueprintError> {
-        let mut primary_drafts = self.primary_branch.resolve()?;
-        let primary_final = primary_drafts.pop().unwrap().resolve()?;
+        let primary_final = self.primary_branch.resolve_exact()?.resolve()?;
 
         let mut branches_final = Vec::with_capacity(self.branches.len());
         for slot in self.branches {

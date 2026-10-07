@@ -20,7 +20,7 @@ pub struct RaceFinal;
 
 impl RaceMode for RaceDraft {
     type TraitItem = Slot<Trait<TraitDraft>>;
-    type BonusSkills = Slot<String>;
+    type BonusSkills = Vec<Slot<String>>;
 }
 
 impl RaceMode for RaceFinal {
@@ -56,7 +56,7 @@ impl Race<RaceDraft> {
         name: impl Into<String>,
         description: impl Into<String>,
         traits: I,
-        bonus_skills: impl Into<Slot<String>>,
+        bonus_skills: Vec<Slot<String>>,
     ) -> Self
     where
         I: IntoIterator<Item = T>,
@@ -67,7 +67,7 @@ impl Race<RaceDraft> {
             name: name.into(),
             description: description.into(),
             traits: traits.into_iter().map(Into::into).collect(),
-            bonus_skills: bonus_skills.into(),
+            bonus_skills,
         }
     }
 
@@ -83,10 +83,12 @@ where
 {
     fn walk_level(&mut self, visitor: &mut V, depth: usize) -> Level {
         if depth == 0 {
-            if let Slot::Choose(choice) = &mut self.bonus_skills {
-                let flow = visitor.visit_choice(choice);
-                if flow != VisitorFlow::Continue {
-                    return Level::from_flow(flow);
+            for skill_slot in &mut self.bonus_skills {
+                if let Slot::Choose(choice) = skill_slot {
+                    let flow = visitor.visit_choice(choice);
+                    if flow != VisitorFlow::Continue {
+                        return Level::from_flow(flow);
+                    }
                 }
             }
             for trait_slot in &mut self.traits {
@@ -99,7 +101,7 @@ where
             }
             
             for trait_slot in &mut self.traits {
-                for child_trait in trait_slot.as_fixed_mut().into_iter().flatten() {
+                if let Some(child_trait) = trait_slot.as_fixed_mut() {
                     let flow = child_trait.walk_choices(visitor);
                     if flow == VisitorFlow::Break {
                         return Level::from_flow(flow);
@@ -125,7 +127,7 @@ impl Blueprint for Race<RaceDraft> {
     type Final = Race<RaceFinal>;
 
     fn is_complete(&self) -> bool {
-        self.bonus_skills.is_complete()
+        self.bonus_skills.iter().all(|s| s.is_complete())
             && self.traits.iter().all(|slot| {
                 slot.is_complete()
                     && slot.selected_values().iter().all(|t| t.is_complete())
@@ -133,7 +135,10 @@ impl Blueprint for Race<RaceDraft> {
     }
 
     fn resolve(self) -> Result<Self::Final, BlueprintError> {
-        let bonus_skills = self.bonus_skills.resolve()?;
+        let mut bonus_skills = Vec::with_capacity(self.bonus_skills.len());
+        for skill in self.bonus_skills {
+            bonus_skills.extend(skill.resolve()?);
+        }
         let mut traits = Vec::with_capacity(self.traits.len());
         for slot in self.traits {
             for trait_draft in slot.resolve()? {
@@ -162,7 +167,7 @@ impl From<Race<RaceFinal>> for Race<RaceDraft> {
                 .into_iter()
                 .map(|t| Slot::fixed(t.into()))
                 .collect(),
-            bonus_skills: Slot::fixed_vec(value.bonus_skills),
+            bonus_skills: value.bonus_skills.into_iter().map(Slot::fixed).collect(),
         }
     }
 }

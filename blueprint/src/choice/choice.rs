@@ -3,11 +3,12 @@ use crate::error::BlueprintError;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum Cardinality {
-    Exact(usize),
     UpTo(usize),
     AtLeast(usize),
-    Any,
+    #[serde(untagged)]
+    Exact(usize),
 }
 
 impl std::fmt::Display for Cardinality {
@@ -16,7 +17,7 @@ impl std::fmt::Display for Cardinality {
             Cardinality::Exact(n) => write!(f, "exactly {}", n),
             Cardinality::UpTo(n) => write!(f, "up to {}", n),
             Cardinality::AtLeast(n) => write!(f, "at least {}", n),
-            Cardinality::Any => write!(f, "any amount"),
+            
         }
     }
 }
@@ -29,7 +30,7 @@ impl Cardinality {
             Cardinality::Exact(n) => count == *n,
             Cardinality::UpTo(n) => count <= *n,
             Cardinality::AtLeast(n) => count >= *n,
-            Cardinality::Any => true,
+            
         }
     }
 
@@ -38,7 +39,7 @@ impl Cardinality {
             Cardinality::Exact(n) => *n,
             Cardinality::UpTo(n) => *n,
             Cardinality::AtLeast(_) => usize::MAX,
-            Cardinality::Any => usize::MAX,
+            
         }
     }
 }
@@ -72,7 +73,7 @@ fn is_default_state(s: &ChoiceState) -> bool {
 pub struct Choice<T> {
     pub prompt: String,
     pub options: Vec<ChoiceOption<T>>,
-    #[serde(default = "default_cardinality", skip_serializing_if = "is_default_cardinality")]
+    #[serde(rename = "choose", default = "default_cardinality", skip_serializing_if = "is_default_cardinality")]
     pub cardinality: Cardinality,
     #[serde(default, skip_serializing_if = "is_default_state")]
     pub state: ChoiceState,
@@ -239,6 +240,20 @@ impl<T> Choice<T> {
                 expected: self.cardinality,
                 actual: indices.len(),
             })
+        }
+    }
+
+    pub fn resolve_exact(self) -> Result<T, BlueprintError> {
+        let prompt = self.prompt.clone();
+        let mut results = self.resolve()?;
+        if results.len() == 1 {
+            Ok(results.pop().unwrap())
+        } else {
+            Err(BlueprintError::Custom(format!(
+                "Expected exactly one resolution for choice '{}', got {}",
+                prompt,
+                results.len()
+            )))
         }
     }
 

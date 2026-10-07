@@ -63,6 +63,6 @@ pub fn dwarf_blueprint() -> RaceBlueprint {
             Slot::fixed(dwarven_combat_training),
             Slot::fixed(tool_proficiency),
         ],
-        Slot::fixed_vec(vec![]),
+        vec![],
     )
 }

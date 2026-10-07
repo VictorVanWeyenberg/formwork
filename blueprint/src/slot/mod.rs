@@ -1,3 +1,3 @@
-mod scalar;
+mod slot;
 
-pub use scalar::Slot;
+pub use slot::Slot;

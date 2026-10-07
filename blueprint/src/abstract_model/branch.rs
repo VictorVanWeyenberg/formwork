@@ -20,7 +20,7 @@ pub struct BranchFinal;
 
 impl BranchMode for BranchDraft {
     type LeafItem = Slot<Leaf>;
-    type Tags = Slot<String>;
+    type Tags = Vec<Slot<String>>;
 }
 
 impl BranchMode for BranchFinal {
@@ -94,12 +94,12 @@ impl Branch<BranchDraft> {
     pub fn draft(
         name: impl Into<String>,
         leaves: impl IntoIterator<Item = Slot<Leaf>>,
-        tags: impl Into<Slot<String>>,
+        tags: Vec<Slot<String>>,
     ) -> Self {
         Self {
             name: name.into(),
             leaves: leaves.into_iter().collect(),
-            tags: tags.into(),
+            tags,
         }
     }
 }
@@ -118,10 +118,12 @@ where
                     }
                 }
             }
-            if let Slot::Choose(choice) = &mut self.tags {
-                let flow = visitor.visit_choice(choice);
-                if flow != VisitorFlow::Continue {
-                    return Level::from_flow(flow);
+            for tag_slot in &mut self.tags {
+                if let Slot::Choose(choice) = tag_slot {
+                    let flow = visitor.visit_choice(choice);
+                    if flow != VisitorFlow::Continue {
+                        return Level::from_flow(flow);
+                    }
                 }
             }
             Level::continue_level(false)
@@ -135,7 +137,7 @@ impl Blueprint for Branch<BranchDraft> {
     type Final = Branch<BranchFinal>;
 
     fn is_complete(&self) -> bool {
-        self.leaves.iter().all(|s| s.is_complete()) && self.tags.is_complete()
+        self.leaves.iter().all(|s| s.is_complete()) && self.tags.iter().all(|s| s.is_complete())
     }
 
     fn resolve(self) -> Result<Self::Final, BlueprintError> {
@@ -143,7 +145,10 @@ impl Blueprint for Branch<BranchDraft> {
         for slot in self.leaves {
             leaves.extend(slot.resolve()?);
         }
-        let tags = self.tags.resolve()?;
+        let mut tags = Vec::with_capacity(self.tags.len());
+        for tag in self.tags {
+            tags.extend(tag.resolve()?);
+        }
         Ok(Branch {
             name: self.name,
             leaves,
@@ -158,7 +163,7 @@ impl From<Branch<BranchFinal>> for Branch<BranchDraft> {
         Branch {
             name: value.name,
             leaves: value.leaves.into_iter().map(Slot::fixed).collect(),
-            tags: Slot::fixed_vec(value.tags),
+            tags: value.tags.into_iter().map(Slot::fixed).collect(),
         }
     }
 }

@@ -12,7 +12,7 @@ use blueprint::Blueprint;
 #[test]
 fn test_all_fixed_draft_resolves_immediately() {
     let leaf = Leaf::new("Oak", 42);
-    let branch = Branch::draft("Main", [leaf.clone().into()], vec!["tall".into(), "green".into()]);
+    let branch = Branch::draft("Main", [leaf.clone().into()], vec![Slot::fixed("tall".into()), Slot::fixed("green".into())]);
     let root = Root::draft("root-1", branch.clone(), [branch.clone().into()]);
 
     assert!(root.is_complete());
@@ -21,7 +21,7 @@ fn test_all_fixed_draft_resolves_immediately() {
     assert_eq!(resolved.id, "root-1");
     assert_eq!(resolved.primary_branch.name, "Main");
     assert_eq!(resolved.primary_branch.leaves, vec![leaf]);
-    assert_eq!(resolved.primary_branch.tags, vec!["tall", "green"]);
+    assert_eq!(resolved.primary_branch.tags, vec!["tall",  "green"]);
     assert_eq!(resolved.branches.len(), 1);
 }
 
@@ -30,12 +30,12 @@ fn test_unresolved_draft_fails_to_resolve() {
     let leaf_choice = Choice::new(
         "Choose a leaf:",
         vec![
-            ChoiceOption::new("Maple", Leaf::new("Maple", 10)),
-            ChoiceOption::new("Pine", Leaf::new("Pine", 20)),
+            ChoiceOption::new("Maple",  Leaf::new("Maple",  10)), 
+            ChoiceOption::new("Pine",  Leaf::new("Pine",  20)), 
         ],
     );
 
-    let branch = Branch::draft("Branch-A", [leaf_choice.into()], vec!["needle".into()]);
+    let branch = Branch::draft("Branch-A", [leaf_choice.into()], vec![Slot::fixed("needle".into())]);
     let root = Root::draft("root-fail", branch, vec![]);
 
     assert!(!root.is_complete());
@@ -79,12 +79,12 @@ fn test_scalar_choice_selection_and_resolution() {
     let leaf_choice = Choice::new(
         "Choose a leaf:",
         vec![
-            ChoiceOption::new("Maple", Leaf::new("Maple", 10)),
-            ChoiceOption::new("Pine", Leaf::new("Pine", 20)),
+            ChoiceOption::new("Maple",  Leaf::new("Maple",  10)), 
+            ChoiceOption::new("Pine",  Leaf::new("Pine",  20)), 
         ],
     );
 
-    let mut branch = Branch::draft("Branch-A", [leaf_choice.into()], vec!["seasonal".into()]);
+    let mut branch = Branch::draft("Branch-A", [leaf_choice.into()], vec![Slot::fixed("seasonal".into())]);
     assert!(!branch.is_complete());
 
     // Select second option (Pine, index 1) using typed visitor
@@ -96,11 +96,11 @@ fn test_scalar_choice_selection_and_resolution() {
     branch.walk_choices(&mut picker);
 
     assert_eq!(picker.recorded_prompt.as_deref(), Some("Choose a leaf:"));
-    assert_eq!(picker.recorded_options, vec!["Maple", "Pine"]);
+    assert_eq!(picker.recorded_options, vec!["Maple",  "Pine"]);
     assert!(branch.is_complete());
 
     let final_branch = branch.resolve().expect("resolved successfully");
-    assert_eq!(final_branch.leaves, vec![Leaf::new("Pine", 20)]);
+    assert_eq!(final_branch.leaves, vec![Leaf::new("Pine",  20)]);
 }
 
 #[test]
@@ -108,17 +108,17 @@ fn test_collection_slot_cardinality_and_validation() {
     let tag_choice = Choice::new(
         "Pick exactly 2 tags:",
         vec![
-            ChoiceOption::new("alpha", "alpha".to_string()),
-            ChoiceOption::new("beta", "beta".to_string()),
-            ChoiceOption::new("gamma", "gamma".to_string()),
+            ChoiceOption::new("alpha",  "alpha".to_string()), 
+            ChoiceOption::new("beta",  "beta".to_string()), 
+            ChoiceOption::new("gamma",  "gamma".to_string()), 
         ],
     ).with_cardinality(Cardinality::Exact(2));
 
     let mut slot = Slot::Choose(tag_choice);
 
     // Try selecting 1 option when 2 are required
-    slot.select(0).unwrap();
-    let err = slot.confirm().unwrap_err();
+    slot.as_choice_mut().unwrap().select(0).unwrap();
+    let err = slot.as_choice_mut().unwrap().confirm().unwrap_err();
     match err {
         BlueprintError::InvalidCardinality { expected, actual, .. } => {
             assert_eq!(expected, Cardinality::Exact(2));
@@ -128,19 +128,19 @@ fn test_collection_slot_cardinality_and_validation() {
     }
 
     // Try duplicate selection
-    let err = slot.select(0).unwrap_err();
+    let err = slot.as_choice_mut().unwrap().select(0).unwrap_err();
     assert!(matches!(err, BlueprintError::DuplicateSelection { .. }));
 
     // Try out of bounds selection
-    let err = slot.select(5).unwrap_err();
+    let err = slot.as_choice_mut().unwrap().select(5).unwrap_err();
     assert!(matches!(err, BlueprintError::IndexOutOfBounds { .. }));
 
     // Valid selection: options 0 and 2 ("alpha", "gamma")
-    slot.select(2).unwrap();
+    slot.as_choice_mut().unwrap().select(2).unwrap();
     assert!(slot.is_made());
 
     let resolved = slot.resolve().unwrap();
-    assert_eq!(resolved, vec!["alpha", "gamma"]);
+    assert_eq!(resolved, vec!["alpha",  "gamma"]);
 }
 
 #[test]
@@ -148,8 +148,8 @@ fn test_unmake_choice_preserves_selection() {
     let leaf_choice = Choice::new(
         "Pick a leaf:",
         vec![
-            ChoiceOption::new("First", Leaf::new("First", 1)),
-            ChoiceOption::new("Second", Leaf::new("Second", 2)),
+            ChoiceOption::new("First",  Leaf::new("First",  1)), 
+            ChoiceOption::new("Second",  Leaf::new("Second",  2)), 
         ],
     );
 
@@ -199,7 +199,7 @@ fn test_unmake_choice_preserves_selection() {
 
     assert!(branch.is_complete());
     let resolved = branch.resolve().unwrap();
-    assert_eq!(resolved.leaves, vec![Leaf::new("First", 1)]);
+    assert_eq!(resolved.leaves, vec![Leaf::new("First",  1)]);
 }
 
 #[test]
@@ -207,26 +207,26 @@ fn test_transitive_blueprint_and_progressive_disclosure() {
     let leaf_choice_a = Choice::new(
         "Leaf for Branch A:",
         vec![
-            ChoiceOption::new("A-1", Leaf::new("A-1", 100)),
-            ChoiceOption::new("A-2", Leaf::new("A-2", 200)),
+            ChoiceOption::new("A-1",  Leaf::new("A-1",  100)), 
+            ChoiceOption::new("A-2",  Leaf::new("A-2",  200)), 
         ],
     );
-    let branch_a = Branch::draft("Branch-A", [leaf_choice_a.into()], vec!["tag-a".into()]);
+    let branch_a = Branch::draft("Branch-A", [leaf_choice_a.into()], vec![Slot::fixed("tag-a".into())]);
 
     let leaf_choice_b = Choice::new(
         "Leaf for Branch B:",
         vec![
-            ChoiceOption::new("B-1", Leaf::new("B-1", 1000)),
-            ChoiceOption::new("B-2", Leaf::new("B-2", 2000)),
+            ChoiceOption::new("B-1",  Leaf::new("B-1",  1000)), 
+            ChoiceOption::new("B-2",  Leaf::new("B-2",  2000)), 
         ],
     );
-    let branch_b = Branch::draft("Branch-B", [leaf_choice_b.into()], vec!["tag-b".into()]);
+    let branch_b = Branch::draft("Branch-B", [leaf_choice_b.into()], vec![Slot::fixed("tag-b".into())]);
 
     let primary_branch_choice = Choice::new(
         "Choose primary branch:",
         vec![
-            ChoiceOption::new("Pick Branch A", branch_a),
-            ChoiceOption::new("Pick Branch B", branch_b),
+            ChoiceOption::new("Pick Branch A",  branch_a), 
+            ChoiceOption::new("Pick Branch B",  branch_b), 
         ],
     );
 
@@ -289,7 +289,7 @@ fn test_transitive_blueprint_and_progressive_disclosure() {
     root.walk_choices(&mut rec);
     assert_eq!(
         rec.prompts,
-        vec!["Choose primary branch:", "Leaf for Branch B:"]
+        vec!["Choose primary branch:",  "Leaf for Branch B:"]
     );
 
     // Select B-2 (index 1) for the leaf
@@ -316,7 +316,7 @@ fn test_transitive_blueprint_and_progressive_disclosure() {
     assert!(root.is_complete());
     let resolved = root.resolve().unwrap();
     assert_eq!(resolved.primary_branch.name, "Branch-B");
-    assert_eq!(resolved.primary_branch.leaves, vec![Leaf::new("B-2", 2000)]);
+    assert_eq!(resolved.primary_branch.leaves, vec![Leaf::new("B-2",  2000)]);
 }
 
 #[test]
@@ -327,18 +327,18 @@ fn test_breadth_first_traversal_order() {
             "Root Primary Choice",
             vec![
                 ChoiceOption::new(
-                    "Branch 1",
-                    Branch::draft("B1", [Choice::new("B1 Leaf Choice", vec![ChoiceOption::new("L1", Leaf::new("L1", 1))]).into()], vec![]),
+                    "Branch 1", 
+                    Branch::draft("B1",  [Choice::new("B1 Leaf Choice",  vec![ChoiceOption::new("L1",  Leaf::new("L1",  1))]).into()], vec![]),
                 ),
             ],
         ),
         vec![
             Slot::pending(Choice::new(
-                "Root Sibling Branch Choice",
+                "Root Sibling Branch Choice", 
                 vec![
                     ChoiceOption::new(
-                        "Branch 2",
-                        Branch::draft("B2", [Choice::new("B2 Leaf Choice", vec![ChoiceOption::new("L2", Leaf::new("L2", 2))]).into()], vec![]),
+                        "Branch 2", 
+                        Branch::draft("B2",  [Choice::new("B2 Leaf Choice",  vec![ChoiceOption::new("L2",  Leaf::new("L2",  2))]).into()], vec![]),
                     ),
                 ],
             )),
@@ -376,10 +376,10 @@ fn test_breadth_first_traversal_order() {
     assert_eq!(
         recorder.0,
         vec![
-            "Root Primary Choice",
-            "Root Sibling Branch Choice",
-            "B1 Leaf Choice",
-            "B2 Leaf Choice",
+            "Root Primary Choice", 
+            "Root Sibling Branch Choice", 
+            "B1 Leaf Choice", 
+            "B2 Leaf Choice", 
         ]
     );
 }
@@ -411,8 +411,8 @@ fn test_lifting_final_to_draft_identity() {
 fn test_serde_roundtrip() {
     let branch = Branch::draft(
         "Oak Branch",
-        [Choice::new("Pick leaf:", vec![ChoiceOption::new("L1", Leaf::new("L1", 1))]).into()],
-        vec!["hardwood".into()],
+        [Choice::new("Pick leaf:", vec![ChoiceOption::new("L1",  Leaf::new("L1",  1))]).into()],
+        vec![Slot::fixed("hardwood".into())],
     );
     let root = Root::draft("r-serde", branch, vec![]);
 
@@ -436,7 +436,7 @@ fn test_choice_serialization_minimal_footprint() {
     // 1. Scalar choice fresh state
     let scalar_choice = Choice::new(
         "Pick one",
-        vec![ChoiceOption::new("A", 10), ChoiceOption::new("B", 20)],
+        vec![ChoiceOption::new("A",  10),  ChoiceOption::new("B",  20)],
     );
     let scalar_json = serde_json::to_string(&scalar_choice).unwrap();
     assert!(!scalar_json.contains("selected_index"));
@@ -450,7 +450,7 @@ fn test_choice_serialization_minimal_footprint() {
     // 2. Collection choice fresh state
     let coll_choice = Choice::new(
         "Pick some",
-        vec![ChoiceOption::new("X", "x".to_string())],
+        vec![ChoiceOption::new("X",  "x".to_string())],
     ).with_cardinality(Cardinality::AtLeast(1));
     let coll_json = serde_json::to_string(&coll_choice).unwrap();
     assert!(!coll_json.contains("selected_indices"));
@@ -493,7 +493,7 @@ fn test_typed_builder_usage() {
 
     assert_eq!(root.id, "r-builder");
     assert_eq!(root.primary_branch.name, "BuilderBranch");
-    assert_eq!(root.primary_branch.leaves, vec![Leaf::new("L", 5)]);
+    assert_eq!(root.primary_branch.leaves, vec![Leaf::new("L",  5)]);
     assert_eq!(root.branches.len(), 1);
 }
 
@@ -503,8 +503,8 @@ fn test_typed_builder_adding_leaves_and_branches_one_at_a_time() {
     let leaf_choice = Choice::new(
         "Pick a special leaf:",
         vec![
-            ChoiceOption::new("Golden", Leaf::new("Golden Leaf", 100)),
-            ChoiceOption::new("Silver", Leaf::new("Silver Leaf", 50)),
+            ChoiceOption::new("Golden",  Leaf::new("Golden Leaf",  100)), 
+            ChoiceOption::new("Silver",  Leaf::new("Silver Leaf",  50)), 
         ],
     );
 
@@ -523,12 +523,12 @@ fn test_typed_builder_adding_leaves_and_branches_one_at_a_time() {
         "Choose an extra branch:",
         vec![
             ChoiceOption::new(
-                "Secondary Branch",
+                "Secondary Branch", 
                 BranchBlueprint::builder()
                     .name("Secondary")
-                    .with_leaf(Leaf::new("Sec Leaf", 2))
-                    .build(),
-            ),
+                    .with_leaf(Leaf::new("Sec Leaf",  2))
+                    .build(), 
+            ), 
         ],
     );
 
@@ -566,23 +566,23 @@ fn test_scalar_slot_cannot_have_cardinality_discrepancy() {
     let scalar_choice = Choice::new(
         "Choose one leaf:",
         vec![
-            ChoiceOption::new("A", Leaf::new("A", 1)),
-            ChoiceOption::new("B", Leaf::new("B", 2)),
+            ChoiceOption::new("A",  Leaf::new("A",  1)), 
+            ChoiceOption::new("B",  Leaf::new("B",  2)), 
         ],
     );
 
     let slot = Slot::pending(scalar_choice);
-    assert_eq!(slot.cardinality(), Cardinality::Exact(1));
+    assert_eq!(slot.as_choice().unwrap().cardinality, Cardinality::Exact(1));
 
     let collection_choice = Choice::new(
         "Pick up to 2 tags:",
         vec![
-            ChoiceOption::new("t1", "t1".to_string()),
-            ChoiceOption::new("t2", "t2".to_string()),
+            ChoiceOption::new("t1",  "t1".to_string()), 
+            ChoiceOption::new("t2",  "t2".to_string()), 
         ],
     ).with_cardinality(Cardinality::UpTo(2));
     let collection_slot = Slot::Choose(collection_choice);
-    assert_eq!(collection_slot.cardinality(), Cardinality::UpTo(2));
+    assert_eq!(collection_slot.as_choice().unwrap().cardinality, Cardinality::UpTo(2));
 }
 
 // -------------------------------------------------------------
@@ -634,20 +634,20 @@ impl ChoiceVisitor<String> for TypedWizardUI {
 fn test_strongly_typed_multi_impl_visitor() {
     let leaf_choice = Choice::new(
         "Pick a leaf",
-        vec![ChoiceOption::new("L1", Leaf::new("Leaf1", 10))],
+        vec![ChoiceOption::new("L1",  Leaf::new("Leaf1",  10))],
     );
     let tag_choice = Choice::new(
         "Pick tags",
-        vec![ChoiceOption::new("t1", "Tag1".to_string())],
+        vec![ChoiceOption::new("t1",  "Tag1".to_string())],
     ).with_cardinality(Cardinality::ONE);
 
     let branch = BranchBlueprint {
         name: "Branch 1".into(),
         leaves: vec![Slot::pending(leaf_choice)],
-        tags: Slot::Choose(tag_choice),
+        tags: vec![Slot::Choose(tag_choice)],
     };
 
-    let branch_choice = Choice::new("Pick branch", vec![ChoiceOption::new("B1", branch)]);
+    let branch_choice = Choice::new("Pick branch", vec![ChoiceOption::new("B1",  branch)]);
 
     let mut root = RootBlueprint {
         id: "root-wizard".into(),
@@ -678,21 +678,21 @@ fn test_step_back_navigation_with_selection_preservation() {
     let leaf_choice = Choice::new(
         "Pick a leaf",
         vec![
-            ChoiceOption::new("L1", Leaf::new("L1", 1)),
-            ChoiceOption::new("L2", Leaf::new("L2", 2)),
+            ChoiceOption::new("L1",  Leaf::new("L1",  1)), 
+            ChoiceOption::new("L2",  Leaf::new("L2",  2)), 
         ],
     );
 
     let branch = BranchBlueprint {
         name: "Branch 1".into(),
         leaves: vec![Slot::pending(leaf_choice)],
-        tags: Slot::Fixed(vec![]),
+        tags: vec![],
     };
 
     let branch_choice = Choice::new(
         "Pick branch",
         vec![
-            ChoiceOption::new("B1", branch),
+            ChoiceOption::new("B1",  branch), 
         ],
     );
 
@@ -751,4 +751,51 @@ fn test_step_back_navigation_with_selection_preservation() {
 
     let final_root = root.resolve().unwrap();
     assert_eq!(final_root.primary_branch.leaves[0].name, "L1");
+}
+
+#[test]
+fn test_multi_select_choice_integration() {
+    let skill_choice = Choice::new(
+        "Choose 3 skills",
+        vec![
+            ChoiceOption::new("Acrobatics", "Acrobatics".to_string()),
+            ChoiceOption::new("Athletics", "Athletics".to_string()),
+            ChoiceOption::new("History", "History".to_string()),
+            ChoiceOption::new("Insight", "Insight".to_string()),
+            ChoiceOption::new("Stealth", "Stealth".to_string()),
+        ],
+    )
+    .with_cardinality(Cardinality::Exact(3));
+
+    let mut branch = Branch::<BranchDraft>::builder()
+        .name("Rogue")
+        .with_leaf(Leaf::new("Sneak Attack", 1))
+        .tags(vec![Slot::Choose(skill_choice)])
+        .build();
+
+    struct SkillVisitor;
+    impl ChoiceVisitor<Leaf> for SkillVisitor {
+        fn visit_choice(&mut self, _c: &mut Choice<Leaf>) -> VisitorFlow {
+            VisitorFlow::Continue
+        }
+    }
+    impl ChoiceVisitor<String> for SkillVisitor {
+        fn visit_choice(&mut self, c: &mut Choice<String>) -> VisitorFlow {
+            c.select(0).unwrap(); // Acrobatics
+            c.select(3).unwrap(); // Insight
+            c.select(4).unwrap(); // Stealth
+            VisitorFlow::Continue
+        }
+    }
+
+    let mut visitor = SkillVisitor;
+    branch.walk_choices(&mut visitor);
+
+    assert!(branch.is_complete());
+
+    let final_branch = branch.resolve().unwrap();
+    assert_eq!(
+        final_branch.tags,
+        vec!["Acrobatics".to_string(), "Insight".to_string(), "Stealth".to_string()]
+    );
 }
