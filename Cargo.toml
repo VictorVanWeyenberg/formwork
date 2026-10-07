@@ -1,3 +1,0 @@
-[workspace]
-members = ["hkd_spike", "spike_derive", "probe"]
-resolver = "2"

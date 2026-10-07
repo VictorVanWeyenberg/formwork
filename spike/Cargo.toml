@@ -1,0 +1,3 @@
+[workspace]
+members = ["hkd_spike", "spike_derive"]
+resolver = "2"
