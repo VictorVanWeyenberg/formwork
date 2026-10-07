@@ -77,6 +77,38 @@ pub fn generate_blueprint(ast: &BlueprintStruct) -> TokenStream {
         quote! { #(#complete_checks)&&* }
     };
 
+    let mut from_fields = Vec::new();
+    for field in &ast.fields {
+        let field_name = &field.ident;
+        if let Some(config) = &field.config {
+            if config.is_vec {
+                from_fields.push(quote! {
+                    #field_name: value.#field_name.into_iter().map(|item| blueprint::Slot::Fixed(item.into())).collect()
+                });
+            } else if config.is_choice && field.inner_type_if_vec().is_some() {
+                from_fields.push(quote! {
+                    #field_name: {
+                        let mut choice = blueprint::Choice::new("Lifted", value.#field_name.into_iter().map(Into::into).collect::<Vec<_>>());
+                        let len = choice.options().len();
+                        choice = choice.with_cardinality(blueprint::choice::Cardinality::Exact(len));
+                        for i in 0..len {
+                            choice.select(i).unwrap();
+                        }
+                        blueprint::Slot::Choose(choice)
+                    }
+                });
+            } else {
+                from_fields.push(quote! {
+                    #field_name: blueprint::Slot::Fixed(value.#field_name.into())
+                });
+            }
+        } else {
+            from_fields.push(quote! {
+                #field_name: value.#field_name
+            });
+        }
+    }
+
     quote! {
         impl blueprint::Blueprint for #blueprint_type {
             type Final = #name<#final_struct>;
@@ -89,6 +121,14 @@ pub fn generate_blueprint(ast: &BlueprintStruct) -> TokenStream {
                 Ok(#name {
                     #(#resolve_fields),*
                 })
+            }
+        }
+
+        impl From<#name<#final_struct>> for #blueprint_type {
+            fn from(value: #name<#final_struct>) -> Self {
+                Self {
+                    #(#from_fields),*
+                }
             }
         }
     }

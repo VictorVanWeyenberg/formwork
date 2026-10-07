@@ -43,6 +43,7 @@ pub fn generate_struct(ast: &BlueprintStruct) -> TokenStream {
 
         if let Some(config) = &field.config {
             let choice_fn_name = format_ident!("add_{}_choice", field_name);
+            let with_choice_fn_name = format_ident!("with_{}_choice", field_name);
             
             let draft_inner_type = if config.is_nested {
                 let base = field.base_type();
@@ -59,12 +60,30 @@ pub fn generate_struct(ast: &BlueprintStruct) -> TokenStream {
                         self.#field_name.push(blueprint::Slot::Choose(choice));
                     }
                 });
+                if is_vec_in_both {
+                    mutators.push(quote! {
+                        pub fn #with_choice_fn_name(&mut self, choice: blueprint::Choice<#draft_inner_type>) 
+                        where blueprint::Slot<#draft_inner_type>: Into<<M as #mode_trait>::#mode_type_name> 
+                        {
+                            self.#field_name.push(blueprint::Slot::Choose(choice).into());
+                        }
+                    });
+                }
             } else {
                 draft_methods.push(quote! {
                     pub fn #choice_fn_name(&mut self, choice: blueprint::Choice<#draft_inner_type>) {
                         self.#field_name = blueprint::Slot::Choose(choice);
                     }
                 });
+                if is_vec_in_both {
+                    mutators.push(quote! {
+                        pub fn #with_choice_fn_name(&mut self, choice: blueprint::Choice<#draft_inner_type>) 
+                        where blueprint::Slot<#draft_inner_type>: Into<<M as #mode_trait>::#mode_type_name> 
+                        {
+                            self.#field_name = blueprint::Slot::Choose(choice).into();
+                        }
+                    });
+                }
             }
         }
     }

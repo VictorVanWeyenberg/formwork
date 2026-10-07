@@ -68,7 +68,9 @@ pub fn generate_modes(ast: &BlueprintStruct) -> TokenStream {
             #(#mode_types)*
         }
 
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
         pub struct #draft_struct;
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
         pub struct #final_struct;
 
         impl #mode_trait for #draft_struct {
