@@ -1,5 +1,7 @@
 use schematic_macro::schematic;
 use schematic::Schematic;
+use schematic::choice::{MultiChoice, Cardinality};
+use schematic::slot::{SingleSlot, MultiSlot};
 
 #[schematic(builder)]
 struct Root {
@@ -13,34 +15,29 @@ struct Root {
 
 #[test]
 fn test_all_slot_types() {
-    let _d = RootUnresolved;
-    let _f = RootResolved;
-    
     let mut _r: RootSchematic = Root {
-        leaf: schematic::Slot::Fixed("hi".to_string()),
-        dwarf_traits: vec![
-            schematic::Slot::Fixed("trait1".to_string()),
-            schematic::Slot::Choose(schematic::Choice::new("Pick trait", vec![
-                "trait2".to_string(),
-                "trait3".to_string(),
-            ])),
-        ],
-        class_skills: schematic::Slot::Choose(
-            schematic::Choice::new("Pick skills", vec![
+        leaf: SingleSlot::FixedUnresolved("hi".to_string()),
+        dwarf_traits: vec![MultiSlot::Choose(MultiChoice::new("Pick traits", vec![
+            "trait1".to_string(),
+            "trait2".to_string(),
+        ]).with_cardinality(Cardinality::Exact(2)))],
+        class_skills: vec![MultiSlot::Choose(
+            MultiChoice::new("Pick skills", vec![
                 "A".to_string(),
                 "B".to_string(),
                 "C".to_string(),
-            ]).with_cardinality(schematic::Cardinality::Exact(2))
-        ),
+            ]).with_cardinality(Cardinality::Exact(2))
+        )],
     };
     
     assert!(!_r.is_complete());
     
-    if let Some(c) = _r.dwarf_traits[1].as_choice_mut() {
+    if let Some(c) = _r.dwarf_traits[0].as_choice_mut() {
         c.select(0).unwrap();
+        c.select(1).unwrap();
     }
     
-    if let Some(c) = _r.class_skills.as_choice_mut() {
+    if let Some(c) = _r.class_skills[0].as_choice_mut() {
         c.select(0).unwrap();
         c.select(1).unwrap();
     }

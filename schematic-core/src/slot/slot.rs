@@ -1,129 +1,116 @@
-use crate::choice::{Choice};
+use crate::choice::{SingleChoice, MultiChoice};
 use crate::error::SchematicError;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum Slot<T> {
-    Choose(Choice<T>),
-    Fixed(T),
+pub enum Slot<U, R, C> {
+    Choose(C),
+    FixedUnresolved(U),
+    FixedResolved(R),
 }
 
-impl<T> Slot<T> {
-    pub fn fixed(value: T) -> Self {
-        Slot::Fixed(value)
+pub type SingleSlot<U, R> = Slot<U, R, SingleChoice<U>>;
+pub type MultiSlot<U, R> = Slot<U, R, MultiChoice<U>>;
+
+impl<U, R, C> Slot<U, R, C> {
+    pub fn as_choice(&self) -> Option<&C> {
+        match self {
+            Slot::Choose(c) => Some(c),
+            _ => None,
+        }
     }
 
+    pub fn as_choice_mut(&mut self) -> Option<&mut C> {
+        match self {
+            Slot::Choose(c) => Some(c),
+            _ => None,
+        }
+    }
+}
 
-
-    pub fn choose(choice: Choice<T>) -> Self {
+impl<U, R> From<SingleChoice<U>> for SingleSlot<U, R> {
+    fn from(choice: SingleChoice<U>) -> Self {
         Slot::Choose(choice)
     }
+}
 
-    pub fn pending(choice: Choice<T>) -> Self {
+impl<U, R> From<MultiChoice<U>> for MultiSlot<U, R> {
+    fn from(choice: MultiChoice<U>) -> Self {
         Slot::Choose(choice)
     }
+}
 
-    pub fn is_fixed(&self) -> bool {
-        matches!(self, Slot::Fixed(_))
+impl<U, R> From<U> for SingleSlot<U, R> {
+    fn from(value: U) -> Self {
+        Slot::FixedUnresolved(value)
     }
+}
 
+impl<U, R> From<U> for MultiSlot<U, R> {
+    fn from(value: U) -> Self {
+        Slot::FixedUnresolved(value)
+    }
+}
+
+impl<U, R> SingleSlot<U, R> {
     pub fn is_pending(&self) -> bool {
         match self {
-            Slot::Fixed(_) => false,
             Slot::Choose(c) => !c.is_made(),
+            _ => false,
         }
     }
 
     pub fn is_made(&self) -> bool {
         match self {
-            Slot::Fixed(_) => false,
             Slot::Choose(c) => c.is_made(),
+            _ => false,
         }
     }
 
     pub fn is_complete(&self) -> bool {
         match self {
-            Slot::Fixed(_) => true,
+            Slot::FixedUnresolved(_) | Slot::FixedResolved(_) => true,
             Slot::Choose(c) => c.is_made(),
         }
     }
 
-    pub fn as_fixed(&self) -> Option<&T> {
+    pub fn resolve_exact(self) -> Result<U, SchematicError> {
         match self {
-            Slot::Fixed(v) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn as_fixed_mut(&mut self) -> Option<&mut T> {
-        match self {
-            Slot::Fixed(v) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn as_choice(&self) -> Option<&Choice<T>> {
-        match self {
-            Slot::Choose(c) => Some(c),
-            _ => None,
-        }
-    }
-
-    pub fn as_choice_mut(&mut self) -> Option<&mut Choice<T>> {
-        match self {
-            Slot::Choose(c) => Some(c),
-            _ => None,
-        }
-    }
-
-    pub fn selected_values(&self) -> Vec<&T> {
-        match self {
-            Slot::Fixed(v) => vec![v],
-            Slot::Choose(c) => c.selected_values(),
-        }
-    }
-
-    pub fn selected_values_mut(&mut self) -> Vec<&mut T> {
-        match self {
-            Slot::Fixed(v) => vec![v],
-            Slot::Choose(c) => c.selected_values_mut(),
-        }
-    }
-
-    pub fn resolve(self) -> Result<Vec<T>, SchematicError> {
-        match self {
-            Slot::Fixed(value) => Ok(vec![value]),
-            Slot::Choose(choice) => choice.resolve(),
-        }
-    }
-
-    pub fn resolve_exact(self) -> Result<T, SchematicError> {
-        match self {
-            Slot::Fixed(value) => Ok(value),
-            Slot::Choose(choice) => choice.resolve_exact(),
+            Slot::FixedUnresolved(u) => Ok(u),
+            Slot::Choose(c) => c.resolve_exact(),
+            Slot::FixedResolved(_) => Err(SchematicError::Custom("Slot already resolved".into())),
         }
     }
 }
 
-impl<T> From<T> for Slot<T> {
-    fn from(value: T) -> Self {
-        Slot::fixed(value)
+impl<U, R> MultiSlot<U, R> {
+    pub fn is_pending(&self) -> bool {
+        match self {
+            Slot::Choose(c) => !c.is_made(),
+            _ => false,
+        }
     }
-}
 
-
-
-impl<T> From<Choice<T>> for Slot<T> {
-    fn from(choice: Choice<T>) -> Self {
-        Slot::Choose(choice)
+    pub fn is_made(&self) -> bool {
+        match self {
+            Slot::Choose(c) => c.is_made(),
+            _ => false,
+        }
     }
-}
 
+    pub fn is_complete(&self) -> bool {
+        match self {
+            Slot::FixedUnresolved(_) | Slot::FixedResolved(_) => true,
+            Slot::Choose(c) => c.is_made(),
+        }
+    }
 
-
-impl<T: Default> Default for Slot<T> {
-    fn default() -> Self {
-        Slot::Fixed(T::default())
+    pub fn resolve(self) -> Result<Vec<U>, SchematicError> {
+        match self {
+            Slot::FixedUnresolved(u) => Ok(vec![u]),
+            Slot::Choose(c) => c.resolve(),
+            Slot::FixedResolved(_) => Err(SchematicError::Custom("Slot already resolved".into())),
+        }
     }
 }

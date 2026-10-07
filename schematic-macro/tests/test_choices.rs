@@ -1,5 +1,7 @@
 use schematic_macro::schematic;
 use schematic::Schematic;
+use schematic::choice::{MultiChoice, Cardinality};
+use schematic::slot::{SingleSlot, MultiSlot};
 
 #[schematic]
 struct Invocation {
@@ -16,24 +18,24 @@ struct Warlock {
 #[test]
 fn test_nested_choice() {
     let mut warlock: WarlockSchematic = Warlock {
-        invocations: schematic::Slot::Choose(
-            schematic::Choice::new("Pick 2 Invocations", vec![
-                Invocation {
-                    spell_choice: schematic::Slot::Fixed("Eldritch Blast".to_string()),
+        invocations: vec![MultiSlot::Choose(
+            MultiChoice::new("Pick 2 Invocations", vec![
+                InvocationSchematic {
+                    spell_choice: SingleSlot::FixedUnresolved("Eldritch Blast".to_string()),
                 },
-                Invocation {
-                    spell_choice: schematic::Slot::Fixed("Hex".to_string()),
+                InvocationSchematic {
+                    spell_choice: SingleSlot::FixedUnresolved("Hex".to_string()),
                 },
-                Invocation {
-                    spell_choice: schematic::Slot::Fixed("Armor of Agathys".to_string()),
+                InvocationSchematic {
+                    spell_choice: SingleSlot::FixedUnresolved("Armor of Agathys".to_string()),
                 },
-            ]).with_cardinality(schematic::Cardinality::Exact(2))
-        ),
+            ]).with_cardinality(Cardinality::Exact(2))
+        )],
     };
     
     assert!(!warlock.is_complete());
     
-    if let Some(c) = warlock.invocations.as_choice_mut() {
+    if let Some(c) = warlock.invocations[0].as_choice_mut() {
         c.select(0).unwrap();
         c.select(2).unwrap();
     }

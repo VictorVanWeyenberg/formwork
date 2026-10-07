@@ -9,6 +9,7 @@ pub fn generate_schematic(ast: &SchematicStruct) -> TokenStream {
 
     let mut complete_checks = Vec::new();
     let mut resolve_fields = Vec::new();
+    let mut from_fields = Vec::new();
 
     if let darling::ast::Data::Struct(fields) = &ast.data {
         for field in &fields.fields {
@@ -16,60 +17,51 @@ pub fn generate_schematic(ast: &SchematicStruct) -> TokenStream {
 
             if field.is_slot() {
                 let config = field.slot_config().unwrap().unwrap();
-                match (config.collection, config.pick) {
-                    (true, _) => {
-                        complete_checks.push(quote! {
-                            self.#field_name.iter().all(|s| s.is_complete())
-                        });
+                if config.collection || config.pick {
+                    complete_checks.push(quote! { self.#field_name.iter().all(|slot| slot.is_complete()) });
 
-                        let resolve_expr = if config.cascade {
-                            quote! {
-                                self.#field_name.into_iter()
-                                    .map(|s| s.resolve())
-                                    .collect::<Result<Vec<_>, schematic::error::SchematicError>>()?
-                                    .into_iter()
-                                    .flatten()
-                                    .map(|inner| inner.resolve())
-                                    .collect::<Result<Vec<_>, schematic::error::SchematicError>>()?
-                            }
-                        } else {
-                            quote! {
-                                self.#field_name.into_iter()
-                                    .map(|s| s.resolve())
-                                    .collect::<Result<Vec<_>, schematic::error::SchematicError>>()?
-                                    .into_iter()
-                                    .flatten()
-                                    .collect()
-                            }
-                        };
-                        resolve_fields.push(quote! { #field_name: #resolve_expr });
-                    },
-                    (_, true) => {
-                        complete_checks.push(quote! { self.#field_name.is_complete() });
-                        let resolve_expr = if config.cascade {
-                            quote! {
-                                self.#field_name.resolve()?
-                                    .into_iter()
-                                    .map(|inner| inner.resolve())
-                                    .collect::<Result<Vec<_>, schematic::error::SchematicError>>()?
-                            }
-                        } else {
-                            quote! { self.#field_name.resolve()? }
-                        };
-                        resolve_fields.push(quote! { #field_name: #resolve_expr });
-                    },
-                    _ => {
-                        complete_checks.push(quote! { self.#field_name.is_complete() });
-                        let resolve_expr = if config.cascade {
-                            quote! { self.#field_name.resolve_exact()?.resolve()? }
-                        } else {
-                            quote! { self.#field_name.resolve_exact()? }
-                        };
-                        resolve_fields.push(quote! { #field_name: #resolve_expr });
-                    }
+                    let resolve_expr = if config.cascade {
+                        quote! {
+                            self.#field_name.into_iter()
+                                .map(|slot| slot.resolve())
+                                .collect::<Result<Vec<_>, schematic::error::SchematicError>>()?
+                                .into_iter()
+                                .flatten()
+                                .map(|inner| inner.resolve())
+                                .collect::<Result<Vec<_>, schematic::error::SchematicError>>()?
+                        }
+                    } else {
+                        quote! {
+                            self.#field_name.into_iter()
+                                .map(|slot| slot.resolve())
+                                .collect::<Result<Vec<_>, schematic::error::SchematicError>>()?
+                                .into_iter()
+                                .flatten()
+                                .collect()
+                        }
+                    };
+                    resolve_fields.push(quote! { #field_name: #resolve_expr });
+
+                    from_fields.push(quote! {
+                        #field_name: value.#field_name.into_iter().map(schematic::Slot::FixedResolved).collect()
+                    });
+                } else {
+                    complete_checks.push(quote! { self.#field_name.is_complete() });
+
+                    let resolve_expr = if config.cascade {
+                        quote! { self.#field_name.resolve_exact()?.resolve()? }
+                    } else {
+                        quote! { self.#field_name.resolve_exact()? }
+                    };
+                    resolve_fields.push(quote! { #field_name: #resolve_expr });
+
+                    from_fields.push(quote! {
+                        #field_name: schematic::Slot::FixedResolved(value.#field_name)
+                    });
                 }
             } else {
                 resolve_fields.push(quote! { #field_name: self.#field_name });
+                from_fields.push(quote! { #field_name: value.#field_name });
             }
         }
     }
@@ -79,41 +71,6 @@ pub fn generate_schematic(ast: &SchematicStruct) -> TokenStream {
     } else {
         quote! { #(#complete_checks)&&* }
     };
-
-    let mut from_fields = Vec::new();
-    if let darling::ast::Data::Struct(fields) = &ast.data {
-        for field in &fields.fields {
-            let field_name = field.ident.as_ref().unwrap();
-            if field.is_slot() {
-                let config = field.slot_config().unwrap().unwrap();
-                if config.collection {
-                    from_fields.push(quote! {
-                        #field_name: value.#field_name.into_iter().map(|item| schematic::Slot::Fixed(item.into())).collect()
-                    });
-                } else if config.pick && field.inner_type_if_vec().is_some() {
-                    from_fields.push(quote! {
-                        #field_name: {
-                            let mut choice = schematic::Choice::new("Lifted", value.#field_name.into_iter().map(Into::into).collect::<Vec<_>>());
-                            let len = choice.options().len();
-                            choice = choice.with_cardinality(schematic::choice::Cardinality::Exact(len));
-                            for i in 0..len {
-                                choice.select(i).unwrap();
-                            }
-                            schematic::Slot::Choose(choice)
-                        }
-                    });
-                } else {
-                    from_fields.push(quote! {
-                        #field_name: schematic::Slot::Fixed(value.#field_name.into())
-                    });
-                }
-            } else {
-                from_fields.push(quote! {
-                    #field_name: value.#field_name
-                });
-            }
-        }
-    }
 
     quote! {
         impl schematic::Schematic for #schematic_type {

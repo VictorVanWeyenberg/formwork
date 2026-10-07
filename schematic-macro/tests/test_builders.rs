@@ -1,5 +1,6 @@
 use schematic_macro::schematic;
 use schematic::Schematic;
+use schematic::choice::{MultiChoice, Cardinality};
 
 #[schematic(builder)]
 struct Root {
@@ -16,25 +17,18 @@ fn test_builders() {
     let mut unresolved: RootSchematic = Root::builder()
         .leaf("hi".to_string())
         .with_dwarf_traits("trait1".to_string())
-        .class_skills(schematic::Choice::new("Pick skills", vec![
+        .with_class_skills(MultiChoice::new("Pick skills", vec![
             "A".to_string(),
             "B".to_string(),
             "C".to_string(),
-        ]).with_cardinality(schematic::Cardinality::Exact(2)))
+        ]).with_cardinality(Cardinality::Exact(2)))
         .build();
 
-    unresolved.add_dwarf_traits_pick(schematic::Choice::new("Pick trait", vec![
-        "trait2".to_string(),
-        "trait3".to_string(),
-    ]));
+    unresolved.dwarf_traits.push(schematic::MultiSlot::FixedUnresolved("trait2".to_string()));
 
     assert!(!unresolved.is_complete());
     
-    if let Some(c) = unresolved.dwarf_traits[1].as_choice_mut() {
-        c.select(0).unwrap();
-    }
-    
-    if let Some(c) = unresolved.class_skills.as_choice_mut() {
+    if let Some(c) = unresolved.class_skills[0].as_choice_mut() {
         c.select(0).unwrap();
         c.select(1).unwrap();
     }

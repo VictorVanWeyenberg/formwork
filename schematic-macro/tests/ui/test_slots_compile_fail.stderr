@@ -1,0 +1,25 @@
+warning: unused import: `Cardinality`
+ --> tests/ui/test_slots_compile_fail.rs:2:52
+  |
+2 | use schematic::choice::{SingleChoice, MultiChoice, Cardinality};
+  |                                                    ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0308]: mismatched types
+  --> tests/ui/test_slots_compile_fail.rs:15:15
+   |
+15 |         leaf: MultiSlot::Choose(MultiChoice::new("Pick leaf", vec!["A".to_string()])), // Expected SingleSlot
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Slot<String, String, _>`, found `Slot<String, _, MultiChoice<String>>`
+   |
+   = note: expected enum `Slot<String, String, SingleChoice<String>>`
+              found enum `Slot<String, _, MultiChoice<String>>`
+
+error[E0308]: mismatched types
+  --> tests/ui/test_slots_compile_fail.rs:16:23
+   |
+16 |         dwarf_traits: SingleSlot::Choose(SingleChoice::new("Pick trait", vec!["A".to_string()])), // Expected MultiSlot
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Vec<Slot<String, String, _>>`, found `Slot<String, _, SingleChoice<String>>`
+   |
+   = note: expected struct `Vec<Slot<String, String, MultiChoice<String>>>`
+                found enum `Slot<String, _, SingleChoice<String>>`

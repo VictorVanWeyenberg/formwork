@@ -17,7 +17,7 @@ pub fn generate_visitor(ast: &SchematicStruct) -> TokenStream {
                 let config = field.slot_config().unwrap().unwrap();
                 let unresolved_inner_type = if config.cascade {
                     let base = field.base_type();
-                    let unresolved_inner_mode = format_ident!("{}Unresolved", crate::ast::base_ident_name(base).unwrap());
+                    let unresolved_inner_mode = crate::ast::unresolved_mode_type(base).unwrap();
                     quote! { #base<#unresolved_inner_mode> }
                 } else {
                     let base = field.base_type();
@@ -34,11 +34,11 @@ pub fn generate_visitor(ast: &SchematicStruct) -> TokenStream {
                     });
                 }
 
-                if config.collection {
+                if config.collection || config.pick {
                     walk_logic.push(quote! {
                         for slot in &mut self.#field_name {
                             if let schematic::Slot::Choose(choice) = slot {
-                                let flow = visitor.visit_choice(choice);
+                                let flow = visitor.visit_multi(choice);
                                 if flow != schematic::VisitorFlow::Continue {
                                     return schematic::Level::from_flow(flow);
                                 }
@@ -49,7 +49,7 @@ pub fn generate_visitor(ast: &SchematicStruct) -> TokenStream {
                     if config.cascade {
                         walk_logic.push(quote! {
                             for slot in &mut self.#field_name {
-                                if let Some(child) = slot.as_fixed_mut() {
+                                if let schematic::Slot::FixedUnresolved(child) = slot {
                                     let flow = schematic::Schematic::walk_choices(child, visitor);
                                     if flow == schematic::VisitorFlow::Break {
                                         return schematic::Level::from_flow(flow);
@@ -69,7 +69,7 @@ pub fn generate_visitor(ast: &SchematicStruct) -> TokenStream {
                 } else {
                     walk_logic.push(quote! {
                         if let schematic::Slot::Choose(choice) = &mut self.#field_name {
-                            let flow = visitor.visit_choice(choice);
+                            let flow = visitor.visit_single(choice);
                             if flow != schematic::VisitorFlow::Continue {
                                 return schematic::Level::from_flow(flow);
                             }
@@ -78,7 +78,7 @@ pub fn generate_visitor(ast: &SchematicStruct) -> TokenStream {
 
                     if config.cascade {
                         walk_logic.push(quote! {
-                            if let Some(child) = self.#field_name.as_fixed_mut() {
+                            if let schematic::Slot::FixedUnresolved(ref mut child) = self.#field_name {
                                 let flow = schematic::Schematic::walk_choices(child, visitor);
                                 if flow == schematic::VisitorFlow::Break {
                                     return schematic::Level::from_flow(flow);
