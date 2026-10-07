@@ -5,6 +5,7 @@ use crate::choice::{Choice, ChoiceCollection};
 pub enum VisitorFlow {
     Continue,
     Break,
+    Back,
 }
 
 /// A visitor for walking through single-value choices of type `T` in a blueprint hierarchy.
@@ -172,5 +173,24 @@ impl<T> ChoiceCollectionVisitor<T> for AutoSelectFirst {
             let _ = choice.select(&[0]);
         }
         VisitorFlow::Continue
+    }
+}
+
+/// Utility visitor that immediately returns `VisitorFlow::Back` to step backward in the traversal.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StepBack;
+
+impl<T> ChoiceVisitor<T> for StepBack {
+    fn visit_choice(&mut self, _choice: &mut Choice<T>) -> VisitorFlow {
+        VisitorFlow::Back
+    }
+}
+
+impl<T> ChoiceCollectionVisitor<T> for StepBack {
+    fn visit_choice_collection(
+        &mut self,
+        _choice: &mut ChoiceCollection<T>,
+    ) -> VisitorFlow {
+        VisitorFlow::Back
     }
 }

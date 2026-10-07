@@ -98,14 +98,16 @@ where
         if depth == 0 {
             // --- Immediate choices at Race level ---
             if let SlotCollection::Choose(choice) = &mut self.bonus_skills {
-                if visitor.visit_choice_collection(choice) == VisitorFlow::Break {
-                    return Level::break_level();
+                let flow = visitor.visit_choice_collection(choice);
+                if flow != VisitorFlow::Continue {
+                    return Level::from_flow(flow);
                 }
             }
             for trait_slot in &mut self.traits {
                 if let Slot::Choose(choice) = trait_slot {
-                    if visitor.visit_choice(choice) == VisitorFlow::Break {
-                        return Level::break_level();
+                    let flow = visitor.visit_choice(choice);
+                    if flow != VisitorFlow::Continue {
+                        return Level::from_flow(flow);
                     }
                 }
             }

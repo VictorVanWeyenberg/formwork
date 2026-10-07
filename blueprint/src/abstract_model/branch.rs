@@ -113,14 +113,16 @@ where
         if depth == 0 {
             for leaf_slot in &mut self.leaves {
                 if let Slot::Choose(choice) = leaf_slot {
-                    if visitor.visit_choice(choice) == VisitorFlow::Break {
-                        return Level::break_level();
+                    let flow = visitor.visit_choice(choice);
+                    if flow != VisitorFlow::Continue {
+                        return Level::from_flow(flow);
                     }
                 }
             }
             if let SlotCollection::Choose(choice) = &mut self.tags {
-                if visitor.visit_choice_collection(choice) == VisitorFlow::Break {
-                    return Level::break_level();
+                let flow = visitor.visit_choice_collection(choice);
+                if flow != VisitorFlow::Continue {
+                    return Level::from_flow(flow);
                 }
             }
             Level::continue_level(false)

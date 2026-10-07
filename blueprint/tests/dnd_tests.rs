@@ -2,7 +2,7 @@ use blueprint::choice::{Choice, ChoiceCollection};
 use blueprint::dnd_model::*;
 use blueprint::visitor::{
     AutoSelectFirst, ChoiceCollectionVisitor, ChoiceVisitor,
-    VisitorFlow,
+    VisitorFlow, StepBack,
 };
 use blueprint::Blueprint;
 
@@ -133,8 +133,8 @@ fn test_dwarf_unmake_choice_and_reselect() {
     dwarf.walk_choices(&mut selector);
     assert!(dwarf.is_complete());
 
-    // Unmake the choice via unmake_last_choice()
-    let unmade = dwarf.unmake_last_choice();
+    // Unmake the choice via walk_choices(&mut StepBack) == VisitorFlow::Back
+    let unmade = dwarf.walk_choices(&mut StepBack) == VisitorFlow::Back;
     assert!(unmade);
     assert!(!dwarf.is_complete());
 

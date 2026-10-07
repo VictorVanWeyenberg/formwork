@@ -86,8 +86,9 @@ where
         if depth == 0 {
             for effect_slot in &mut self.effects {
                 if let Slot::Choose(choice) = effect_slot {
-                    if visitor.visit_choice(choice) == VisitorFlow::Break {
-                        return Level::break_level();
+                    let flow = visitor.visit_choice(choice);
+                    if flow != VisitorFlow::Continue {
+                        return Level::from_flow(flow);
                     }
                 }
             }

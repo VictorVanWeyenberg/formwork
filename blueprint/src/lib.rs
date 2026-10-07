@@ -23,7 +23,7 @@ pub use choice::{Choice, ChoiceCollection, ChoiceOption};
 pub use error::BlueprintError;
 pub use visitor::{
     AutoSelectFirst, ChoiceCollectionVisitor, ChoiceVisitor,
-    ConfirmAll, Counter, TargetUnmaker, UnmakeAll, VisitorFlow,
+    ConfirmAll, Counter, TargetUnmaker, UnmakeAll, VisitorFlow, StepBack,
 };
 pub use slot::{Slot, SlotCollection};
 pub use node::Node;

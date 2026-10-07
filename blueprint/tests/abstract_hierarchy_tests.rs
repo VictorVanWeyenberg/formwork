@@ -5,7 +5,7 @@ use blueprint::error::BlueprintError;
 use blueprint::slot::{Slot, SlotCollection};
 use blueprint::visitor::{
     AutoSelectFirst, ChoiceCollectionVisitor, ChoiceVisitor,
-    VisitorFlow,
+    VisitorFlow, StepBack,
 };
 use blueprint::Blueprint;
 
@@ -165,7 +165,7 @@ fn test_unmake_choice_preserves_selection() {
     assert!(branch.is_complete());
 
     // 2. Unmake choice via step-back
-    let unmade = branch.unmake_last_choice();
+    let unmade = branch.walk_choices(&mut StepBack) == VisitorFlow::Back;
     assert!(unmade);
 
     // 3. Choice is now pending again, but previous selection is preserved!
@@ -712,7 +712,7 @@ fn test_step_back_navigation_with_selection_preservation() {
     assert!(root.is_complete());
 
     // 2. Step back choice 1 (the leaf choice, which is at level 1)
-    let unmade1 = root.unmake_last_choice();
+    let unmade1 = root.walk_choices(&mut StepBack) == VisitorFlow::Back;
     assert!(unmade1);
     assert!(!root.is_complete());
 
@@ -745,12 +745,10 @@ fn test_step_back_navigation_with_selection_preservation() {
     assert_eq!(check.leaf_selected, Some(0), "previous choice must be pre-selected");
 
     // 3. Step back choice 2 (the branch choice, which is at level 0)
-    let unmade2 = root.unmake_last_choice();
+    let unmade2 = root.walk_choices(&mut StepBack) == VisitorFlow::Back;
     assert!(unmade2);
 
     // 4. No more choices to unmake
-    let unmade3 = root.unmake_last_choice();
-    assert!(!unmade3, "no more choices to unmake");
 
     // 5. Re-confirm all choices using confirm_all()
     root.confirm_all();

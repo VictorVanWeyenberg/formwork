@@ -123,14 +123,16 @@ where
         if depth == 0 {
             // --- Immediate choices at Root level ---
             if let Slot::Choose(choice) = &mut self.primary_branch {
-                if visitor.visit_choice(choice) == VisitorFlow::Break {
-                    return Level::break_level();
+                let flow = visitor.visit_choice(choice);
+                if flow != VisitorFlow::Continue {
+                    return Level::from_flow(flow);
                 }
             }
             for branch_slot in &mut self.branches {
                 if let Slot::Choose(choice) = branch_slot {
-                    if visitor.visit_choice(choice) == VisitorFlow::Break {
-                        return Level::break_level();
+                    let flow = visitor.visit_choice(choice);
+                    if flow != VisitorFlow::Continue {
+                        return Level::from_flow(flow);
                     }
                 }
             }
