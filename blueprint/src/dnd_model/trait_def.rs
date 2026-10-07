@@ -2,14 +2,13 @@ use super::effect::Effect;
 use crate::blueprint_trait::{Blueprint, Level, Walkable};
 use crate::choice::Choice;
 use crate::error::BlueprintError;
-use crate::node::Node;
 use crate::slot::Slot;
 use crate::visitor::{ChoiceVisitor, VisitorFlow};
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 pub trait TraitMode {
-    type EffectItem: Node;
+    type EffectItem: Clone + std::fmt::Debug + PartialEq + Eq + serde::Serialize + serde::de::DeserializeOwned;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

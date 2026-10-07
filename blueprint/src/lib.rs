@@ -13,7 +13,6 @@ pub mod choice;
 pub mod error;
 pub mod visitor;
 pub mod slot;
-pub mod node;
 pub mod blueprint_trait;
 pub mod abstract_model;
 pub mod dnd_model;
@@ -26,5 +25,4 @@ pub use visitor::{
     ConfirmAll, Counter, TargetUnmaker, UnmakeAll, VisitorFlow, StepBack,
 };
 pub use slot::{Slot, SlotCollection};
-pub use node::Node;
 pub use blueprint_trait::{Blueprint, Level, Walkable};

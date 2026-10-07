@@ -2,15 +2,14 @@ use super::trait_def::{Trait, TraitDraft, TraitFinal};
 use crate::blueprint_trait::{Blueprint, Level, Walkable};
 use crate::choice::Choice;
 use crate::error::BlueprintError;
-use crate::node::Node;
 use crate::slot::{Slot, SlotCollection};
 use crate::visitor::{ChoiceCollectionVisitor, ChoiceVisitor, VisitorFlow};
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 pub trait RaceMode {
-    type TraitItem: Node;
-    type BonusSkills: Node + Default;
+    type TraitItem: Clone + std::fmt::Debug + PartialEq + Eq + serde::Serialize + serde::de::DeserializeOwned;
+    type BonusSkills: Clone + std::fmt::Debug + PartialEq + Eq + serde::Serialize + serde::de::DeserializeOwned + Default;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
