@@ -1,0 +1,13 @@
+[package]
+name = "stress-test"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+schematic = { path = "../schematic" }
+serde = { version = "1", features = ["derive"] }
+serde_with = "3.22"
+regex = "1.13"
+uuid = { version = "1", features = ["v4", "serde"] }
+either = { version = "1.17", features = ["serde"] }

@@ -1,2 +1,2 @@
 [workspace]
-members = ["schematic", "schematic-macro"]
+members = ["schematic", "schematic-core", "schematic-macro", "stress-test"]
