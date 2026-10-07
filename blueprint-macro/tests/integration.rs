@@ -21,15 +21,15 @@ fn test_all_slot_types() {
         dwarf_traits: vec![
             blueprint::Slot::Fixed("trait1".to_string()),
             blueprint::Slot::Choose(blueprint::Choice::new("Pick trait", vec![
-                blueprint::ChoiceOption::new("trait2", "trait2".to_string()),
-                blueprint::ChoiceOption::new("trait3", "trait3".to_string()),
+                "trait2".to_string(),
+                "trait3".to_string(),
             ])),
         ],
         class_skills: blueprint::Slot::Choose(
             blueprint::Choice::new("Pick skills", vec![
-                blueprint::ChoiceOption::new("A", "A".to_string()),
-                blueprint::ChoiceOption::new("B", "B".to_string()),
-                blueprint::ChoiceOption::new("C", "C".to_string()),
+                "A".to_string(),
+                "B".to_string(),
+                "C".to_string(),
             ]).with_cardinality(blueprint::Cardinality::Exact(2))
         ),
     };
@@ -69,7 +69,7 @@ struct NestedRoot {
 
 #[test]
 fn test_nested_blueprints() {
-    let mut root: NestedRootBlueprint = NestedRoot {
+    let root: NestedRootBlueprint = NestedRoot {
         leaf: blueprint::Slot::Fixed(Leaf {
             name: blueprint::Slot::Fixed("Leaf1".to_string()),
         }),
@@ -88,7 +88,7 @@ fn test_nested_blueprints() {
     // But for the sake of the token generation POC, the types match correctly!
     assert!(root.is_complete());
     
-    let final_root = root.resolve().unwrap();
+    let _final_root = root.resolve().unwrap();
     // Wait, resolve_exact will extract `LeafBlueprint`. Then we need to resolve it!
     // But the current macro generates `self.leaf.resolve_exact()?`.
     // It will return `LeafBlueprint`. BUT final type is `Leaf`!
@@ -113,15 +113,15 @@ fn test_nested_choice() {
     let mut warlock: WarlockBlueprint = Warlock {
         invocations: blueprint::Slot::Choose(
             blueprint::Choice::new("Pick 2 Invocations", vec![
-                blueprint::ChoiceOption::new("Invo1", Invocation {
+                Invocation {
                     spell_choice: blueprint::Slot::Fixed("Eldritch Blast".to_string()),
-                }),
-                blueprint::ChoiceOption::new("Invo2", Invocation {
+                },
+                Invocation {
                     spell_choice: blueprint::Slot::Fixed("Hex".to_string()),
-                }),
-                blueprint::ChoiceOption::new("Invo3", Invocation {
+                },
+                Invocation {
                     spell_choice: blueprint::Slot::Fixed("Armor of Agathys".to_string()),
-                }),
+                },
             ]).with_cardinality(blueprint::Cardinality::Exact(2))
         ),
     };
@@ -148,16 +148,16 @@ fn test_builders() {
         .leaf("hi".to_string())
         .with_dwarf_traits("trait1".to_string())
         .class_skills(blueprint::Choice::new("Pick skills", vec![
-            blueprint::ChoiceOption::new("A", "A".to_string()),
-            blueprint::ChoiceOption::new("B", "B".to_string()),
-            blueprint::ChoiceOption::new("C", "C".to_string()),
+            "A".to_string(),
+            "B".to_string(),
+            "C".to_string(),
         ]).with_cardinality(blueprint::Cardinality::Exact(2)))
         .build();
 
     // Now test draft methods generated on the struct
     draft.add_dwarf_traits_choice(blueprint::Choice::new("Pick trait", vec![
-        blueprint::ChoiceOption::new("trait2", "trait2".to_string()),
-        blueprint::ChoiceOption::new("trait3", "trait3".to_string()),
+        "trait2".to_string(),
+        "trait3".to_string(),
     ]));
 
     assert!(!draft.is_complete());

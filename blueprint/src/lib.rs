@@ -17,7 +17,7 @@ pub mod abstract_model;
 pub mod dnd_model;
 
 
-pub use choice::{Choice, ChoiceOption, ChoiceState, Cardinality};
+pub use choice::{Choice, ChoiceState, Cardinality};
 pub use error::BlueprintError;
 pub use visitor::{
     AutoSelectFirst, ChoiceVisitor,

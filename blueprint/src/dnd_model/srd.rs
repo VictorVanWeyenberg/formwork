@@ -1,7 +1,7 @@
 use super::effect::Effect;
 use super::race::{Race, RaceBlueprint, RaceDraft};
 use super::trait_def::{Trait, TraitDraft};
-use crate::choice::{Choice, ChoiceOption};
+use crate::choice::Choice;
 use crate::slot::{Slot};
 
 /// Constructs the D&D 5e Dwarf race blueprint.
@@ -40,9 +40,9 @@ pub fn dwarf_blueprint() -> RaceBlueprint {
     let tool_choice = Choice::new(
         "Choose one tool proficiency:",
         vec![
-            ChoiceOption::new("Smith's tools", Effect::proficiency("Smith's tools")),
-            ChoiceOption::new("Brewer's supplies", Effect::proficiency("Brewer's supplies")),
-            ChoiceOption::new("Mason's tools", Effect::proficiency("Mason's tools")),
+            Effect::proficiency("Smith's tools"),
+            Effect::proficiency("Brewer's supplies"),
+            Effect::proficiency("Mason's tools"),
         ],
     );
 

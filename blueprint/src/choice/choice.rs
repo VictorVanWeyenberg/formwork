@@ -1,4 +1,4 @@
-use super::option::ChoiceOption;
+
 use crate::error::BlueprintError;
 use serde::{Deserialize, Serialize};
 
@@ -72,7 +72,7 @@ fn is_default_state(s: &ChoiceState) -> bool {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Choice<T> {
     pub prompt: String,
-    pub options: Vec<ChoiceOption<T>>,
+    pub options: Vec<T>,
     #[serde(rename = "choose", default = "default_cardinality", skip_serializing_if = "is_default_cardinality")]
     pub cardinality: Cardinality,
     #[serde(default, skip_serializing_if = "is_default_state")]
@@ -82,7 +82,7 @@ pub struct Choice<T> {
 impl<T> Choice<T> {
     pub fn new(
         prompt: impl Into<String>,
-        options: impl IntoIterator<Item = ChoiceOption<T>>,
+        options: impl IntoIterator<Item = T>,
     ) -> Self {
         Self {
             prompt: prompt.into(),
@@ -101,12 +101,8 @@ impl<T> Choice<T> {
         &self.prompt
     }
 
-    pub fn options(&self) -> &[ChoiceOption<T>] {
+    pub fn options(&self) -> &[T] {
         &self.options
-    }
-
-    pub fn option_labels(&self) -> Vec<&str> {
-        self.options.iter().map(|opt| opt.label.as_str()).collect()
     }
 
     pub fn is_made(&self) -> bool {
@@ -131,7 +127,7 @@ impl<T> Choice<T> {
             .iter()
             .enumerate()
             .filter(|(i, _)| indices.contains(i))
-            .map(|(_, opt)| &opt.value)
+            .map(|(_, opt)| opt)
             .collect()
     }
 
@@ -145,7 +141,7 @@ impl<T> Choice<T> {
             .iter_mut()
             .enumerate()
             .filter(|(i, _)| indices.contains(i))
-            .map(|(_, opt)| &mut opt.value)
+            .map(|(_, opt)| opt)
             .collect()
     }
 
@@ -277,7 +273,7 @@ impl<T> Choice<T> {
         // Remove from the end to avoid shifting indices
         for idx in sorted_indices.into_iter().rev() {
             if idx < self.options.len() {
-                result.push(self.options.remove(idx).value);
+                result.push(self.options.remove(idx));
             }
         }
         result.reverse();

@@ -15,7 +15,7 @@ struct ToolSelector {
 impl ChoiceVisitor<Effect> for ToolSelector {
     fn visit_choice(&mut self, choice: &mut Choice<Effect>) -> VisitorFlow {
         self.recorded_prompt = Some(choice.prompt().to_string());
-        self.recorded_options = choice.option_labels().into_iter().map(String::from).collect();
+        self.recorded_options = choice.options().iter().map(|o| format!("{:?}", o)).collect();
         choice.select(self.chosen_index).unwrap();
         VisitorFlow::Break
     }
@@ -85,7 +85,11 @@ fn test_dwarf_blueprint_wizard_flow_and_resolution() {
     assert_eq!(selector.recorded_prompt.as_deref(), Some("Choose one tool proficiency:"));
     assert_eq!(
         selector.recorded_options,
-        vec!["Smith's tools", "Brewer's supplies", "Mason's tools"]
+        vec![
+            r#"Proficiency { item: "Smith's tools" }"#,
+            r#"Proficiency { item: "Brewer's supplies" }"#,
+            r#"Proficiency { item: "Mason's tools" }"#
+        ]
     );
 
     // 3. Now draft should be complete
@@ -244,19 +248,16 @@ fn test_typed_builder_dnd() {
 
 #[test]
 fn test_typed_builder_dnd_draft_with_choices() {
-    use blueprint::choice::{Choice, ChoiceOption};
+    use blueprint::choice::{Choice};
 
     let trait_choice = Choice::new(
         "Choose an elf trait:",
         vec![
-            ChoiceOption::new(
-                "Keen Senses",
-                Trait::<TraitDraft>::builder()
-                    .title("Keen Senses")
-                    .description("Proficiency in Perception.")
-                    .with_effect(Effect::proficiency("Perception"))
-                    .build(),
-            ),
+            Trait::<TraitDraft>::builder()
+                .title("Keen Senses")
+                .description("Proficiency in Perception.")
+                .with_effect(Effect::proficiency("Perception"))
+                .build(),
         ],
     );
 
