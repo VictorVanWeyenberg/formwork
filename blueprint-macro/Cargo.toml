@@ -12,3 +12,8 @@ quote = "1.0.47"
 syn = { version = "3.0.6", features = ["full"] }
 [dev-dependencies]
 blueprint = { path = "../blueprint" }
+typed-builder = "0.23"
+
+[features]
+default = ["builders"]
+builders = []
