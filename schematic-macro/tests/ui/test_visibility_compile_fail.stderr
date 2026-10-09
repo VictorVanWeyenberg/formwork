@@ -1,0 +1,5 @@
+error[E0616]: field `private_flag` of struct `SecretSettings` is private
+  --> tests/ui/test_visibility_compile_fail.rs:26:25
+   |
+26 |     let flag = settings.private_flag; // Should fail
+   |                         ^^^^^^^^^^^^ private field

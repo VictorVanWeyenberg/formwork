@@ -1,3 +1,3 @@
 mod choice;
 
-pub use choice::{Choice, ChoiceState, Cardinality};
+pub use choice::{SingleChoice, MultiChoice, ChoiceState, Cardinality};

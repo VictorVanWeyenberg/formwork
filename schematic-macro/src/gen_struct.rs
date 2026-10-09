@@ -95,29 +95,36 @@ pub fn generate_struct(ast: &SchematicStruct, original_attrs: &[syn::Attribute],
                     quote! { <#unresolved_struct as #mode_trait>::#mode_type_name }
                 };
 
+                // 1. Raw Slot object
+                trait_impls.push(quote! {
+                    impl #trait_name<#unresolved_struct> for #return_ty_unresolved {
+                        fn into_slot(self) -> #return_ty_unresolved {
+                            self
+                        }
+                    }
+                });
+
+                // 2. Unresolved Inner
+                trait_impls.push(quote! {
+                    impl #trait_name<#unresolved_struct> for #unresolved_inner_type {
+                        fn into_slot(self) -> #return_ty_unresolved {
+                            schematic::Slot::FixedUnresolved(self)
+                        }
+                    }
+                });
+
+                // 3. Resolved Inner (if cascade)
                 if is_cascade {
                     trait_impls.push(quote! {
-                        impl #trait_name<#unresolved_struct> for #unresolved_inner_type {
-                            fn into_slot(self) -> #return_ty_unresolved {
-                                schematic::Slot::FixedUnresolved(self)
-                            }
-                        }
                         impl #trait_name<#unresolved_struct> for #resolved_inner_type {
                             fn into_slot(self) -> #return_ty_unresolved {
                                 schematic::Slot::FixedResolved(self)
                             }
                         }
                     });
-                } else {
-                    trait_impls.push(quote! {
-                        impl #trait_name<#unresolved_struct> for #resolved_inner_type {
-                            fn into_slot(self) -> #return_ty_unresolved {
-                                schematic::Slot::FixedUnresolved(self)
-                            }
-                        }
-                    });
                 }
 
+                // 4. Choice
                 trait_impls.push(quote! {
                     impl #trait_name<#unresolved_struct> for #choice_type {
                         fn into_slot(self) -> #return_ty_unresolved {
@@ -126,13 +133,41 @@ pub fn generate_struct(ast: &SchematicStruct, original_attrs: &[syn::Attribute],
                     }
                 });
 
+                // 5. String / &str ergonomics
+                let base = field.base_type();
+                let is_string = if let syn::Type::Path(p) = base {
+                    p.path.segments.last().map(|s| s.ident == "String").unwrap_or(false)
+                } else { false };
+
+                if is_string {
+                    trait_impls.push(quote! {
+                        impl #trait_name<#unresolved_struct> for &str {
+                            fn into_slot(self) -> #return_ty_unresolved {
+                                schematic::Slot::FixedUnresolved(self.to_string())
+                            }
+                        }
+                    });
+                }
+
+                // 6. Resolved Struct Impl
+                let return_ty_resolved = quote! { #resolved_inner_type };
                 trait_impls.push(quote! {
                     impl #trait_name<#resolved_struct> for #resolved_inner_type {
-                        fn into_slot(self) -> #resolved_inner_type {
+                        fn into_slot(self) -> #return_ty_resolved {
                             self
                         }
                     }
                 });
+
+                if is_string {
+                    trait_impls.push(quote! {
+                        impl #trait_name<#resolved_struct> for &str {
+                            fn into_slot(self) -> #return_ty_resolved {
+                                self.to_string()
+                            }
+                        }
+                    });
+                }
 
                 slot_traits.push(quote! {
                     #trait_def
@@ -144,6 +179,14 @@ pub fn generate_struct(ast: &SchematicStruct, original_attrs: &[syn::Attribute],
                     mutators.push(quote! {
                         pub fn #fn_name(&mut self, item: impl #trait_name<M>) {
                             self.#field_name.extend(std::iter::once(item.into_slot()));
+                        }
+                        
+                        pub fn #field_name<I>(&mut self, items: I) 
+                        where 
+                            I: std::iter::IntoIterator,
+                            I::Item: #trait_name<M>
+                        {
+                            self.#field_name.extend(items.into_iter().map(|item| item.into_slot()));
                         }
                     });
                 }

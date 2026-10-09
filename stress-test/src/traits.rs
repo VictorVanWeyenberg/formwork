@@ -1,4 +1,5 @@
 use crate::effect::Effect;
+use crate::effect::{EffectUnresolved, EffectResolved};
 use schematic::schematic;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -9,7 +10,7 @@ use serde_with::serde_as;
 pub struct Trait {
     title: String,
     description: String,
-    #[slot(collection)]
+    #[slot(collection, cascade)]
     effects: Vec<Effect>,
 }
 

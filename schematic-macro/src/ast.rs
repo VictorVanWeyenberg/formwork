@@ -6,7 +6,7 @@ pub struct SchematicArgs {
     #[darling(default)]
     pub builder: bool,
     #[darling(default)]
-    pub derives: darling::util::PathList,
+    pub derives: Vec<syn::Path>,
 }
 
 #[derive(Debug, FromDeriveInput)]
@@ -20,6 +20,7 @@ pub struct SchematicStruct {
 #[darling(forward_attrs(slot, allow, doc, cfg))]
 pub struct SchematicField {
     pub ident: Option<Ident>,
+    pub vis: syn::Visibility,
     pub ty: Type,
     pub attrs: Vec<Attribute>,
 }
@@ -103,11 +104,29 @@ impl SchematicField {
     }
 }
 
-pub fn base_ident_name(ty: &syn::Type) -> Option<String> {
-    if let syn::Type::Path(syn::TypePath { path, .. }) = ty {
-        if let Some(segment) = path.segments.last() {
-            return Some(segment.ident.to_string());
+
+pub fn unresolved_mode_type(ty: &syn::Type) -> Option<syn::Type> {
+    if let syn::Type::Path(type_path) = ty {
+        let mut new_type_path = type_path.clone();
+        if let Some(last_segment) = new_type_path.path.segments.last_mut() {
+            let ident_str = last_segment.ident.to_string();
+            last_segment.ident = syn::Ident::new(&format!("{}Unresolved", ident_str), last_segment.ident.span());
+            last_segment.arguments = syn::PathArguments::None;
         }
+        return Some(syn::Type::Path(new_type_path));
+    }
+    None
+}
+
+pub fn resolved_mode_type(ty: &syn::Type) -> Option<syn::Type> {
+    if let syn::Type::Path(type_path) = ty {
+        let mut new_type_path = type_path.clone();
+        if let Some(last_segment) = new_type_path.path.segments.last_mut() {
+            let ident_str = last_segment.ident.to_string();
+            last_segment.ident = syn::Ident::new(&format!("{}Resolved", ident_str), last_segment.ident.span());
+            last_segment.arguments = syn::PathArguments::None;
+        }
+        return Some(syn::Type::Path(new_type_path));
     }
     None
 }

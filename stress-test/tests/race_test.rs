@@ -16,7 +16,7 @@ fn main() {
         .id(RaceRef::new(source_ref(), "dwarf").unwrap())
         .name("Dwarf".to_string())
         .description("Dwarf test".to_string())
-        .with_traits(TraitSchematic::from(ability_score_increase()))
+        .with_traits(ability_score_increase())
         .with_traits(tool_proficiency())
         .build();
     println!("{}", serde_json::to_string_pretty(&race).unwrap());

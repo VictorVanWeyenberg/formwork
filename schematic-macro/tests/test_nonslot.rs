@@ -1,5 +1,6 @@
 use schematic_macro::schematic;
 use schematic::Schematic;
+use schematic::slot::SingleSlot;
 
 #[schematic(builder)]
 struct Mixed {
@@ -11,13 +12,9 @@ struct Mixed {
 
 #[test]
 fn test_mixed_fields() {
-    let _d = MixedUnresolved;
-    let _f = MixedResolved;
-    
-    // The schematic type should have normal `id` and `tags`, but `value` is a Slot
     let m: MixedSchematic = Mixed {
         id: "my_id".to_string(),
-        value: schematic::Slot::Fixed(42),
+        value: SingleSlot::FixedUnresolved(42),
         tags: vec!["a".to_string(), "b".to_string()],
     };
     
@@ -32,10 +29,10 @@ fn test_mixed_fields() {
 #[test]
 fn test_mixed_builder() {
     let m: MixedSchematic = Mixed::builder()
-        .id("my_id")
+        .id("my_id".to_string())
         .value(42)
-        .with_tags("a")
-        .with_tags("b")
+        .with_tags("a".to_string())
+        .with_tags("b".to_string())
         .build();
     
     assert!(m.is_complete());

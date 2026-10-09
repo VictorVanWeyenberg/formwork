@@ -1,4 +1,3 @@
-
 use crate::error::SchematicError;
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +16,6 @@ impl std::fmt::Display for Cardinality {
             Cardinality::Exact(n) => write!(f, "exactly {}", n),
             Cardinality::UpTo(n) => write!(f, "up to {}", n),
             Cardinality::AtLeast(n) => write!(f, "at least {}", n),
-            
         }
     }
 }
@@ -30,7 +28,6 @@ impl Cardinality {
             Cardinality::Exact(n) => count == *n,
             Cardinality::UpTo(n) => count <= *n,
             Cardinality::AtLeast(n) => count >= *n,
-            
         }
     }
 
@@ -39,7 +36,6 @@ impl Cardinality {
             Cardinality::Exact(n) => *n,
             Cardinality::UpTo(n) => *n,
             Cardinality::AtLeast(_) => usize::MAX,
-            
         }
     }
 }
@@ -57,6 +53,138 @@ impl Default for ChoiceState {
     }
 }
 
+fn is_default_state(s: &ChoiceState) -> bool {
+    *s == ChoiceState::Pending
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SingleChoice<T> {
+    pub prompt: String,
+    pub options: Vec<T>,
+    #[serde(default, skip_serializing_if = "is_default_state")]
+    pub state: ChoiceState,
+}
+
+impl<T> SingleChoice<T> {
+    pub fn new(prompt: impl Into<String>, options: impl IntoIterator<Item = T>) -> Self {
+        Self {
+            prompt: prompt.into(),
+            options: options.into_iter().collect(),
+            state: ChoiceState::Pending,
+        }
+    }
+
+    pub fn prompt(&self) -> &str {
+        &self.prompt
+    }
+
+    pub fn options(&self) -> &[T] {
+        &self.options
+    }
+
+    pub fn is_made(&self) -> bool {
+        matches!(self.state, ChoiceState::Made(_))
+    }
+
+    pub fn selected_indices(&self) -> &[usize] {
+        match &self.state {
+            ChoiceState::Made(idx) | ChoiceState::UnmadeWithHistory(idx) => idx.as_slice(),
+            ChoiceState::Pending => &[],
+        }
+    }
+
+    pub fn selected_index(&self) -> Option<usize> {
+        self.selected_indices().first().copied()
+    }
+
+    pub fn selected_values(&self) -> Vec<&T> {
+        let indices = self.selected_indices();
+        self.options
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| indices.contains(i))
+            .map(|(_, opt)| opt)
+            .collect()
+    }
+
+    pub fn selected_values_mut(&mut self) -> Vec<&mut T> {
+        let indices = match &self.state {
+            ChoiceState::Made(idx) | ChoiceState::UnmadeWithHistory(idx) => idx.clone(),
+            ChoiceState::Pending => vec![],
+        };
+        self.options
+            .iter_mut()
+            .enumerate()
+            .filter(|(i, _)| indices.contains(i))
+            .map(|(_, opt)| opt)
+            .collect()
+    }
+
+    pub fn select(&mut self, index: usize) -> Result<(), SchematicError> {
+        if index >= self.options.len() {
+            return Err(SchematicError::IndexOutOfBounds {
+                prompt: self.prompt.clone(),
+                index,
+                total_options: self.options.len(),
+            });
+        }
+        if let ChoiceState::Made(_) = self.state {
+            return Err(SchematicError::Custom("Choice already made".into()));
+        }
+        self.state = ChoiceState::Made(vec![index]);
+        Ok(())
+    }
+
+    pub fn unmake(&mut self) -> Result<(), SchematicError> {
+        match &self.state {
+            ChoiceState::Made(_) | ChoiceState::UnmadeWithHistory(_) => {
+                self.state = ChoiceState::Pending;
+                Ok(())
+            }
+            ChoiceState::Pending => Err(SchematicError::CannotUnmakeNotMade {
+                prompt: self.prompt.clone(),
+            }),
+        }
+    }
+
+    pub fn confirm(&mut self) -> Result<(), SchematicError> {
+        if let ChoiceState::Made(_) = self.state {
+            return Ok(());
+        }
+        let indices = match &self.state {
+            ChoiceState::Pending => vec![],
+            ChoiceState::UnmadeWithHistory(idx) => idx.clone(),
+            ChoiceState::Made(idx) => idx.clone(),
+        };
+
+        if indices.len() == 1 {
+            self.state = ChoiceState::Made(indices);
+            Ok(())
+        } else {
+            Err(SchematicError::InvalidCardinality {
+                prompt: self.prompt.clone(),
+                expected: Cardinality::Exact(1),
+                actual: indices.len(),
+            })
+        }
+    }
+
+    pub fn resolve_exact(self) -> Result<T, SchematicError> {
+        if !self.is_made() {
+            return Err(SchematicError::UnresolvedChoice {
+                prompt: self.prompt,
+            });
+        }
+        let indices = match self.state {
+            ChoiceState::Made(idx) => idx,
+            _ => unreachable!(),
+        };
+        let idx = indices[0];
+        let mut options = self.options;
+        Ok(options.remove(idx))
+    }
+}
+
 fn default_cardinality() -> Cardinality {
     Cardinality::Exact(1)
 }
@@ -65,12 +193,8 @@ fn is_default_cardinality(c: &Cardinality) -> bool {
     *c == Cardinality::Exact(1)
 }
 
-fn is_default_state(s: &ChoiceState) -> bool {
-    *s == ChoiceState::Pending
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Choice<T> {
+pub struct MultiChoice<T> {
     pub prompt: String,
     pub options: Vec<T>,
     #[serde(rename = "choose", default = "default_cardinality", skip_serializing_if = "is_default_cardinality")]
@@ -79,11 +203,8 @@ pub struct Choice<T> {
     pub state: ChoiceState,
 }
 
-impl<T> Choice<T> {
-    pub fn new(
-        prompt: impl Into<String>,
-        options: impl IntoIterator<Item = T>,
-    ) -> Self {
+impl<T> MultiChoice<T> {
+    pub fn new(prompt: impl Into<String>, options: impl IntoIterator<Item = T>) -> Self {
         Self {
             prompt: prompt.into(),
             options: options.into_iter().collect(),
@@ -111,8 +232,7 @@ impl<T> Choice<T> {
 
     pub fn selected_indices(&self) -> &[usize] {
         match &self.state {
-            ChoiceState::Made(idx) => idx.as_slice(),
-            ChoiceState::UnmadeWithHistory(idx) => idx.as_slice(),
+            ChoiceState::Made(idx) | ChoiceState::UnmadeWithHistory(idx) => idx.as_slice(),
             ChoiceState::Pending => &[],
         }
     }
@@ -133,8 +253,7 @@ impl<T> Choice<T> {
 
     pub fn selected_values_mut(&mut self) -> Vec<&mut T> {
         let indices = match &self.state {
-            ChoiceState::Made(idx) => idx.clone(),
-            ChoiceState::UnmadeWithHistory(idx) => idx.clone(),
+            ChoiceState::Made(idx) | ChoiceState::UnmadeWithHistory(idx) => idx.clone(),
             ChoiceState::Pending => vec![],
         };
         self.options
@@ -186,19 +305,7 @@ impl<T> Choice<T> {
 
     pub fn unmake(&mut self) -> Result<(), SchematicError> {
         match &self.state {
-            ChoiceState::Made(indices) => {
-                let mut new_history = indices.clone();
-                if self.cardinality.max() > 1 {
-                    new_history.pop();
-                }
-                if new_history.is_empty() {
-                    self.state = ChoiceState::Pending;
-                } else {
-                    self.state = ChoiceState::UnmadeWithHistory(new_history);
-                }
-                Ok(())
-            }
-            ChoiceState::UnmadeWithHistory(indices) => {
+            ChoiceState::Made(indices) | ChoiceState::UnmadeWithHistory(indices) => {
                 let mut new_history = indices.clone();
                 if self.cardinality.max() > 1 {
                     new_history.pop();
@@ -236,20 +343,6 @@ impl<T> Choice<T> {
                 expected: self.cardinality,
                 actual: indices.len(),
             })
-        }
-    }
-
-    pub fn resolve_exact(self) -> Result<T, SchematicError> {
-        let prompt = self.prompt.clone();
-        let mut results = self.resolve()?;
-        if results.len() == 1 {
-            Ok(results.pop().unwrap())
-        } else {
-            Err(SchematicError::Custom(format!(
-                "Expected exactly one resolution for choice '{}', got {}",
-                prompt,
-                results.len()
-            )))
         }
     }
 

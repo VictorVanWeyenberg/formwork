@@ -1,5 +1,5 @@
 use crate::contentref::{RaceRef, Referable, SubraceRef};
-use crate::traits::{Trait, TraitUnresolved};
+use crate::traits::{Trait, TraitUnresolved, TraitResolved};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Display, Formatter};

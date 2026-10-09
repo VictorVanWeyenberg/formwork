@@ -17,10 +17,23 @@ pub fn schematic(attr: TokenStream, item: TokenStream) -> TokenStream {
         Err(e) => return TokenStream::from(darling::Error::from(e).write_errors()),
     };
 
-    let args = match ast::SchematicArgs::from_list(&attr_args) {
+    let mut args = match ast::SchematicArgs::from_list(&attr_args) {
         Ok(v) => v,
         Err(e) => return TokenStream::from(e.write_errors()),
     };
+
+    for attr in &item_struct.attrs {
+        if attr.path().is_ident("derive") {
+            if let Ok(meta) = attr.parse_args_with(syn::punctuated::Punctuated::<syn::Path, syn::Token![,]>::parse_terminated) {
+                for path in meta {
+                    let path_str = quote::quote!(#path).to_string();
+                    if !args.derives.iter().any(|p| quote::quote!(#p).to_string() == path_str) {
+                        args.derives.push(path);
+                    }
+                }
+            }
+        }
+    }
 
     let ast_struct = match ast::SchematicStruct::parse_input(&item_struct) {
         Ok(ast) => ast,

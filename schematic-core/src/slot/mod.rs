@@ -1,3 +1,3 @@
 mod slot;
 
-pub use slot::Slot;
+pub use slot::{Slot, SingleSlot, MultiSlot};

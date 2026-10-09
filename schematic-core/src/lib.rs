@@ -15,11 +15,11 @@ pub mod slot;
 pub mod schematic_trait;
 
 
-pub use choice::{Choice, ChoiceState, Cardinality};
+pub use choice::{SingleChoice, MultiChoice, ChoiceState, Cardinality};
 pub use error::SchematicError;
 pub use visitor::{
     AutoSelectFirst, ChoiceVisitor,
     ConfirmAll, UnmakeAll, VisitorFlow,
 };
-pub use slot::Slot;
+pub use slot::{Slot, SingleSlot, MultiSlot};
 pub use schematic_trait::{Schematic, Level, Walkable};

@@ -5,6 +5,7 @@ use crate::proficiency::Proficiency;
 use crate::race::{Size, Speed, Vision};
 use crate::roll::VantageOnRoll;
 use serde::{Deserialize, Serialize};
+use schematic::schematic;
 use crate::valueref::ValueRef;
 
 #[derive(Serialize, Deserialize)]
@@ -28,12 +29,14 @@ impl EffectId {
     }
 }
 
+#[schematic(builder, derives(Clone, Serialize, Deserialize, PartialEq))]
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct Effect {
     #[serde(skip_serializing_if = "EffectId::is_empty")]
     #[serde(default)]
     id: EffectId,
     #[serde(flatten)]
+    #[slot]
     operation: SheetOperation,
 }
 
