@@ -14,8 +14,8 @@ fn source_ref() -> SourceRef {
 fn main() {
     let race = RaceSchematic::builder()
         .id(RaceRef::new(source_ref(), "dwarf").unwrap())
-        .name("Dwarf".to_string())
-        .description("Dwarf test".to_string())
+        .name("Dwarf")
+        .description("Dwarf test")
         .with_traits(ability_score_increase())
         .with_traits(tool_proficiency())
         .build();
