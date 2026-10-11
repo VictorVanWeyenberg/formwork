@@ -1,11 +1,17 @@
 use crate::error::SchematicError;
 use serde::{Deserialize, Serialize};
 
+/// Cardinality constraint for a [`MultiChoice`].
+///
+/// Defines how many options can or must be selected from the available options.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Cardinality {
+    /// Allows selecting up to `n` options (inclusive).
     UpTo(usize),
+    /// Requires selecting at least `n` options (inclusive).
     AtLeast(usize),
+    /// Requires selecting exactly `n` options.
     #[serde(untagged)]
     Exact(usize),
 }
@@ -21,8 +27,10 @@ impl std::fmt::Display for Cardinality {
 }
 
 impl Cardinality {
+    /// Convenience constant representing exactly one selection.
     pub const ONE: Cardinality = Cardinality::Exact(1);
 
+    /// Checks whether the given selection count satisfies this cardinality constraint.
     pub fn accepts(&self, count: usize) -> bool {
         match self {
             Cardinality::Exact(n) => count == *n,
@@ -31,6 +39,7 @@ impl Cardinality {
         }
     }
 
+    /// Returns the maximum number of items permitted under this cardinality constraint.
     pub fn max(&self) -> usize {
         match self {
             Cardinality::Exact(n) => *n,
@@ -40,23 +49,48 @@ impl Cardinality {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Internal plumbing: tracks the lifecycle state of a choice.
+///
+/// # Warning
+/// This is an **internal plumbing** type used by [`SingleChoice`] and [`MultiChoice`].
+/// Application code should never manipulate or inspect `ChoiceState` directly.
+/// Instead, interact with choices through their high-level methods:
+/// [`select`](SingleChoice::select), [`unmake`](SingleChoice::unmake),
+/// and [`confirm`](SingleChoice::confirm).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChoiceState {
+    /// Choice has not been made yet.
+    #[default]
     Pending,
+    /// Choice was previously made but has been unmade, preserving the previous selection history.
     UnmadeWithHistory(Vec<usize>),
+    /// Choice has been confirmed with the specified option indices.
     Made(Vec<usize>),
-}
-
-impl Default for ChoiceState {
-    fn default() -> Self {
-        ChoiceState::Pending
-    }
 }
 
 fn is_default_state(s: &ChoiceState) -> bool {
     *s == ChoiceState::Pending
 }
 
+/// A user-facing choice where exactly one option must be selected.
+///
+/// `SingleChoice` encapsulates a human-readable prompt and a collection of candidate options
+/// of type `T`. It tracks whether a selection has been made, unmade, or is still pending.
+///
+/// # Example
+/// ```rust
+/// use schematic_core::choice::SingleChoice;
+///
+/// let mut choice = SingleChoice::new(
+///     "Pick a starter tool",
+///     vec!["Smith's Tools".to_string(), "Brewer's Supplies".to_string()],
+/// );
+/// assert!(!choice.is_made());
+///
+/// choice.select(0).unwrap();
+/// assert!(choice.is_made());
+/// assert_eq!(choice.resolve_exact().unwrap(), "Smith's Tools");
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SingleChoice<T> {
     pub prompt: String,
@@ -137,7 +171,11 @@ impl<T> SingleChoice<T> {
 
     pub fn unmake(&mut self) -> Result<(), SchematicError> {
         match &self.state {
-            ChoiceState::Made(_) | ChoiceState::UnmadeWithHistory(_) => {
+            ChoiceState::Made(idx) => {
+                self.state = ChoiceState::UnmadeWithHistory(idx.clone());
+                Ok(())
+            }
+            ChoiceState::UnmadeWithHistory(_) => {
                 self.state = ChoiceState::Pending;
                 Ok(())
             }
@@ -193,11 +231,38 @@ fn is_default_cardinality(c: &Cardinality) -> bool {
     *c == Cardinality::Exact(1)
 }
 
+/// A user-facing choice where multiple options can be selected based on a [`Cardinality`] constraint.
+///
+/// `MultiChoice` holds a prompt, a list of candidate options, and a [`Cardinality`] rule
+/// (such as `Exact(2)`, `UpTo(3)`, or `AtLeast(1)`). When selections meet the maximum cardinality,
+/// the choice is automatically marked made. For range cardinalities like `UpTo` or `AtLeast`,
+/// calling [`confirm`](MultiChoice::confirm) verifies the selection count before marking it made.
+///
+/// # Example
+/// ```rust
+/// use schematic_core::choice::{MultiChoice, Cardinality};
+///
+/// let mut choice = MultiChoice::new(
+///     "Pick two bonus skills",
+///     vec!["Athletics".to_string(), "Stealth".to_string(), "Perception".to_string()],
+/// ).with_cardinality(Cardinality::Exact(2));
+///
+/// choice.select(0).unwrap();
+/// assert!(!choice.is_made());
+///
+/// choice.select(2).unwrap();
+/// assert!(choice.is_made());
+/// assert_eq!(choice.resolve().unwrap(), vec!["Athletics", "Perception"]);
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MultiChoice<T> {
     pub prompt: String,
     pub options: Vec<T>,
-    #[serde(rename = "choose", default = "default_cardinality", skip_serializing_if = "is_default_cardinality")]
+    #[serde(
+        rename = "choose",
+        default = "default_cardinality",
+        skip_serializing_if = "is_default_cardinality"
+    )]
     pub cardinality: Cardinality,
     #[serde(default, skip_serializing_if = "is_default_state")]
     pub state: ChoiceState,
@@ -272,7 +337,7 @@ impl<T> MultiChoice<T> {
                 total_options: self.options.len(),
             });
         }
-        
+
         let mut indices = match &self.state {
             ChoiceState::Pending => vec![],
             ChoiceState::UnmadeWithHistory(history) => {
@@ -281,8 +346,10 @@ impl<T> MultiChoice<T> {
                 } else {
                     history.clone()
                 }
-            },
-            ChoiceState::Made(_) => return Err(SchematicError::Custom("Choice already made".into())),
+            }
+            ChoiceState::Made(_) => {
+                return Err(SchematicError::Custom("Choice already made".into()))
+            }
         };
 
         if !indices.contains(&index) {
@@ -299,7 +366,7 @@ impl<T> MultiChoice<T> {
         } else {
             self.state = ChoiceState::UnmadeWithHistory(indices);
         }
-        
+
         Ok(())
     }
 
@@ -327,7 +394,7 @@ impl<T> MultiChoice<T> {
         if let ChoiceState::Made(_) = self.state {
             return Ok(());
         }
-        
+
         let indices = match &self.state {
             ChoiceState::Pending => vec![],
             ChoiceState::UnmadeWithHistory(idx) => idx.clone(),
@@ -352,16 +419,16 @@ impl<T> MultiChoice<T> {
                 prompt: self.prompt,
             });
         }
-        
+
         let indices = match self.state {
             ChoiceState::Made(idx) => idx,
             _ => unreachable!(),
         };
-        
+
         let mut sorted_indices = indices.clone();
         sorted_indices.sort_unstable();
         sorted_indices.dedup();
-        
+
         let mut result = Vec::new();
         // Remove from the end to avoid shifting indices
         for idx in sorted_indices.into_iter().rev() {
@@ -370,7 +437,7 @@ impl<T> MultiChoice<T> {
             }
         }
         result.reverse();
-        
+
         Ok(result)
     }
 }

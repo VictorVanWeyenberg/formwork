@@ -1,0 +1,5 @@
+error: unsupported slot attribute argument
+ --> tests/ui/02_unsupported_slot_arg.rs:5:12
+  |
+5 |     #[slot(invalid_arg)]
+  |            ^^^^^^^^^^^
