@@ -57,12 +57,14 @@ impl FromStr for CastingTime {
         } else if hours_captures.is_some() {
             match (&hours_captures.unwrap()["hours"]).parse::<usize>() {
                 Ok(hours) => Ok(CastingTime::Hours(hours)),
-                Err(_) => Err("Hours regex matches but cannot parse number of hours.".to_string())
+                Err(_) => Err("Hours regex matches but cannot parse number of hours.".to_string()),
             }
         } else if minutes_captures.is_some() {
             match (&minutes_captures.unwrap()["minutes"]).parse::<usize>() {
                 Ok(minutes) => Ok(CastingTime::Minutes(minutes)),
-                Err(_) => Err("Minutes regex matches but cannot parse number of minutes.".to_string())
+                Err(_) => {
+                    Err("Minutes regex matches but cannot parse number of minutes.".to_string())
+                }
             }
         } else {
             Err(format!("Unsupported casting time: \"{}\".", time_string))

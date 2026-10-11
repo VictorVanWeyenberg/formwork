@@ -1,6 +1,6 @@
-use schematic_macro::schematic;
 use schematic::Schematic;
-use schematic::slot::{SingleSlot, MultiSlot};
+use schematic::slot::{MultiSlot, SingleSlot};
+use schematic_macro::schematic;
 
 #[schematic]
 struct Leaf {
@@ -22,13 +22,11 @@ fn test_nested_schematics() {
         leaf: SingleSlot::FixedUnresolved(LeafSchematic {
             name: SingleSlot::FixedUnresolved("Leaf1".to_string()),
         }),
-        leafs: vec![MultiSlot::FixedUnresolved(
-            LeafSchematic {
-                name: SingleSlot::FixedUnresolved("Leaf2".to_string()),
-            }
-        )],
+        leafs: vec![MultiSlot::FixedUnresolved(LeafSchematic {
+            name: SingleSlot::FixedUnresolved("Leaf2".to_string()),
+        })],
     };
-    
+
     assert!(root.is_complete());
     let resolved = root.resolve().unwrap();
     assert_eq!(resolved.leaf.name, "Leaf1");

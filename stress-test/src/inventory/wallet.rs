@@ -39,7 +39,13 @@ impl Wallet {
         Wallet::new(copper, silver, electrum, gold, platinum)
     }
 
-    pub fn new(copper: usize, silver: usize, electrum: usize, gold: usize, platinum: usize) -> Wallet {
+    pub fn new(
+        copper: usize,
+        silver: usize,
+        electrum: usize,
+        gold: usize,
+        platinum: usize,
+    ) -> Wallet {
         Wallet {
             copper: Cost::new(copper, Coin::Copper),
             silver: Cost::new(silver, Coin::Silver),
@@ -76,7 +82,11 @@ impl Wallet {
     }
 
     fn to_coppers(&self) -> usize {
-        self.copper.to_coppers() + self.silver.to_coppers() + self.gold.to_coppers() + self.electrum.to_coppers() + self.platinum.to_coppers()
+        self.copper.to_coppers()
+            + self.silver.to_coppers()
+            + self.gold.to_coppers()
+            + self.electrum.to_coppers()
+            + self.platinum.to_coppers()
     }
 }
 
@@ -89,7 +99,7 @@ pub struct Cost {
 impl Serialize for Cost {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer
+        S: Serializer,
     {
         serializer.serialize_str(&format!("{} {}", self.amount, &self.coin))
     }
@@ -98,7 +108,7 @@ impl Serialize for Cost {
 impl<'de> Deserialize<'de> for Cost {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>
+        D: Deserializer<'de>,
     {
         let cost_regex = Regex::new("^(?<amount>\\d+)\\s(?<coin>cp|sp|ep|gp|pp)$").expect("");
         if let Some(captures) = cost_regex.captures(&String::deserialize(deserializer)?) {
@@ -185,13 +195,17 @@ pub enum Coin {
 
 impl Display for Coin {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Coin::Copper => "cp",
-            Coin::Silver => "sp",
-            Coin::Electrum => "ep",
-            Coin::Gold => "gp",
-            Coin::Platinum => "pp"
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Coin::Copper => "cp",
+                Coin::Silver => "sp",
+                Coin::Electrum => "ep",
+                Coin::Gold => "gp",
+                Coin::Platinum => "pp",
+            }
+        )
     }
 }
 
@@ -222,7 +236,9 @@ mod test {
     #[test]
     fn one_copper_from_one_platinum() {
         let mut wallet = Wallet::new(0, 0, 0, 0, 1);
-        wallet.subtract(Cost::new(1, Coin::Copper)).expect("Unexpected error");
+        wallet
+            .subtract(Cost::new(1, Coin::Copper))
+            .expect("Unexpected error");
         assert_eq!(wallet.copper.amount, 9);
         assert_eq!(wallet.silver.amount, 4);
         assert_eq!(wallet.electrum.amount, 1);
@@ -234,7 +250,9 @@ mod test {
     fn hundred_copper_from_random_wallet() {
         let mut wallet = Wallet::new(23, 16, 2, 5, 1);
         let before_coppers = wallet.to_coppers();
-        wallet.subtract(Cost::new(100, Coin::Copper)).expect("Unexpected error");
+        wallet
+            .subtract(Cost::new(100, Coin::Copper))
+            .expect("Unexpected error");
         let after_coppers = wallet.to_coppers();
         assert_eq!(before_coppers - after_coppers, 100);
     }
@@ -243,7 +261,9 @@ mod test {
     fn thousand_copper_from_random_wallet() {
         let mut wallet = Wallet::new(23, 16, 2, 5, 1);
         let before_coppers = wallet.to_coppers();
-        wallet.subtract(Cost::new(1000, Coin::Copper)).expect("Unexpected error");
+        wallet
+            .subtract(Cost::new(1000, Coin::Copper))
+            .expect("Unexpected error");
         let after_coppers = wallet.to_coppers();
         assert_eq!(before_coppers - after_coppers, 1000);
     }

@@ -4,7 +4,7 @@ use schematic_macro::schematic;
 pub struct Child {
     #[slot]
     name: String,
-    
+
     non_slot_name: String,
 }
 

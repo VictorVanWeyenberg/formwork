@@ -4,7 +4,7 @@ use crate::dice::Dice;
 use crate::inventory::item::Weight;
 use crate::inventory::wallet::Cost;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use std::fmt::{Display, Formatter};
 
 #[serde_as]

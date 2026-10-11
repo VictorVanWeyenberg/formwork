@@ -1,6 +1,6 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
@@ -14,7 +14,10 @@ pub struct SpellDuration {
 
 impl SpellDuration {
     pub fn new(concentration: bool, duration: Duration) -> SpellDuration {
-        SpellDuration { concentration, duration }
+        SpellDuration {
+            concentration,
+            duration,
+        }
     }
     pub fn concentration(&self) -> &bool {
         &self.concentration
@@ -41,16 +44,21 @@ impl FromStr for SpellDuration {
     fn from_str(spell_duration_string: &str) -> Result<Self, Self::Err> {
         if let Some(captures) = Regex::new("^Concentration, (?<duration>.*)$")
             .unwrap()
-            .captures(&spell_duration_string) {
+            .captures(&spell_duration_string)
+        {
             let duration = Duration::from_str(&captures["duration"])?;
             Ok(SpellDuration::new(true, duration))
         } else if let Some(captures) = Regex::new("^(?<duration>.*)$")
             .unwrap()
-            .captures(&spell_duration_string) {
+            .captures(&spell_duration_string)
+        {
             let duration = Duration::from_str(&captures["duration"])?;
             Ok(SpellDuration::new(false, duration))
         } else {
-            Err(format!("Unsupported spell duration: \"{}\".", spell_duration_string))
+            Err(format!(
+                "Unsupported spell duration: \"{}\".",
+                spell_duration_string
+            ))
         }
     }
 }
@@ -132,7 +140,7 @@ impl Display for Duration {
                 }
             }
             Duration::Special => write!(f, "Special"),
-            Duration::Until(until) => write!(f, "Until {}", until)
+            Duration::Until(until) => write!(f, "Until {}", until),
         }
     }
 }
@@ -147,64 +155,75 @@ impl FromStr for Duration {
             Ok(Duration::Instantaneous)
         } else if let Some(captures) = Regex::new("^(?<minutes>\\d+) (minute|minutes)$")
             .unwrap()
-            .captures(&duration_string) {
+            .captures(&duration_string)
+        {
             match (&captures["minutes"]).parse::<usize>() {
                 Ok(minutes) => Ok(Duration::Minutes(minutes)),
-                Err(_) => Err("Minutes regex matches but unable to parse minutes.".to_string())
+                Err(_) => Err("Minutes regex matches but unable to parse minutes.".to_string()),
             }
         } else if let Some(captures) = Regex::new("^(?<hours>\\d+) (hour|hours)$")
             .unwrap()
-            .captures(&duration_string) {
+            .captures(&duration_string)
+        {
             match (&captures["hours"]).parse::<usize>() {
                 Ok(hours) => Ok(Duration::Hours(hours)),
-                Err(_) => Err("Hours regex matches but unable to parse hours.".to_string())
+                Err(_) => Err("Hours regex matches but unable to parse hours.".to_string()),
             }
         } else if let Some(captures) = Regex::new("^(?<days>\\d+) (day|days)$")
             .unwrap()
-            .captures(&duration_string) {
+            .captures(&duration_string)
+        {
             match (&captures["days"]).parse::<usize>() {
                 Ok(days) => Ok(Duration::Days(days)),
-                Err(_) => Err("Days regex matches but unable to parse days.".to_string())
+                Err(_) => Err("Days regex matches but unable to parse days.".to_string()),
             }
         } else if let Some(captures) = Regex::new("^(?<rounds>\\d+) (round|rounds)$")
             .unwrap()
-            .captures(&duration_string) {
+            .captures(&duration_string)
+        {
             match (&captures["rounds"]).parse::<usize>() {
                 Ok(rounds) => Ok(Duration::Rounds(rounds)),
-                Err(_) => Err("Rounds regex matches but unable to parse rounds.".to_string())
+                Err(_) => Err("Rounds regex matches but unable to parse rounds.".to_string()),
             }
         } else if let Some(captures) = Regex::new("^(Up|up) to (?<minutes>\\d+) (minute|minutes)$")
             .unwrap()
-            .captures(&duration_string) {
+            .captures(&duration_string)
+        {
             match (&captures["minutes"]).parse::<usize>() {
                 Ok(minutes) => Ok(Duration::UpToMinutes(minutes)),
-                Err(_) => Err("UpToMinutes regex matches but unable to parse minutes.".to_string())
+                Err(_) => Err("UpToMinutes regex matches but unable to parse minutes.".to_string()),
             }
         } else if let Some(captures) = Regex::new("^(Up|up) to (?<hours>\\d+) (hour|hours)$")
             .unwrap()
-            .captures(&duration_string) {
+            .captures(&duration_string)
+        {
             match (&captures["hours"]).parse::<usize>() {
                 Ok(hours) => Ok(Duration::UpToHours(hours)),
-                Err(_) => Err("UpToHours regex matches but unable to parse hours.".to_string())
+                Err(_) => Err("UpToHours regex matches but unable to parse hours.".to_string()),
             }
         } else if let Some(captures) = Regex::new("^(Up|up) to (?<days>\\d+) (day|days)$")
             .unwrap()
-            .captures(&duration_string) {
+            .captures(&duration_string)
+        {
             match (&captures["days"]).parse::<usize>() {
                 Ok(days) => Ok(Duration::UpToDays(days)),
-                Err(_) => Err("UpToDays regex matches but unable to parse days.".to_string())
+                Err(_) => Err("UpToDays regex matches but unable to parse days.".to_string()),
             }
         } else if let Some(captures) = Regex::new("^(Up|up) to (?<rounds>\\d+) (round|rounds)$")
             .unwrap()
-            .captures(&duration_string) {
+            .captures(&duration_string)
+        {
             match (&captures["rounds"]).parse::<usize>() {
                 Ok(rounds) => Ok(Duration::UpToRounds(rounds)),
-                Err(_) => Err("UpToRounds regex matches but unable to parse rounds.".to_string())
+                Err(_) => Err("UpToRounds regex matches but unable to parse rounds.".to_string()),
             }
-        } else if let Some(captures) = Regex::new("^(Until|until) (?<untils>(( or )?(dispelled|triggered))+)$")
-            .unwrap()
-            .captures(&duration_string) {
-            captures["untils"].split(" or ")
+        } else if let Some(captures) =
+            Regex::new("^(Until|until) (?<untils>(( or )?(dispelled|triggered))+)$")
+                .unwrap()
+                .captures(&duration_string)
+        {
+            captures["untils"]
+                .split(" or ")
                 .map(|until| CastingDurationUntil::from_str(until))
                 .collect::<Result<Vec<CastingDurationUntil>, _>>()
                 .map(CastingDurationUntils::from)
@@ -236,10 +255,15 @@ impl From<CastingDurationUntil> for CastingDurationUntils {
 
 impl Display for CastingDurationUntils {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.untils.iter()
-            .map(|until| format!("{}", until))
-            .collect::<Vec<String>>()
-            .join(" or "))
+        write!(
+            f,
+            "{}",
+            self.untils
+                .iter()
+                .map(|until| format!("{}", until))
+                .collect::<Vec<String>>()
+                .join(" or ")
+        )
     }
 }
 

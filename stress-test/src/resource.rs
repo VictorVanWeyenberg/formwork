@@ -5,8 +5,6 @@ pub enum Resource {
     BonusAction,
     Reaction,
     Custom(String),
-    SpellSlot {
-        minimum_level: usize,
-    },
+    SpellSlot { minimum_level: usize },
     Item(Item),
 }

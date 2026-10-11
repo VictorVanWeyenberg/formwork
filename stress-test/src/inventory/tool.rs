@@ -2,7 +2,7 @@ use crate::contentref::ToolRef;
 use crate::inventory::item::Weight;
 use crate::inventory::wallet::Cost;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize, PartialEq)]

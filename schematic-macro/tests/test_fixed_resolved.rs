@@ -2,8 +2,9 @@ use schematic::slot::SingleSlot;
 
 #[test]
 fn test_fixed_resolved_error() {
-    let slot: SingleSlot<String, String> = schematic::slot::Slot::FixedResolved("already resolved".to_string());
-    
+    let slot: SingleSlot<String, String> =
+        schematic::slot::Slot::FixedResolved("already resolved".to_string());
+
     assert!(slot.is_complete());
     let res = slot.resolve_exact();
     assert!(res.is_err());

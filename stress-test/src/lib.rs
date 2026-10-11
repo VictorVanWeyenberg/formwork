@@ -1,3 +1,30 @@
+//! # D&D 5e Character Sheet Verification Suite
+//!
+//! This crate serves as a comprehensive, end-to-end verification suite modeling the complex domain
+//! rules of a Dungeons & Dragons 5th Edition character sheet using [`schematic`].
+//!
+//! # Schematic Domain Modeling
+//!
+//! In D&D 5e, character creation involves deeply nested choices that cascade through multiple
+//! layers of rules and features:
+//!
+//! 1. **Race ([`race::Race`])**:
+//!    Grants racial traits (e.g., Dwarven Resilience, Tool Proficiency) modeled via
+//!    `#[slot(collection, cascade)] traits: Vec<Trait>`.
+//! 2. **Traits ([`traits::Trait`])**:
+//!    Represent racial or class features that confer concrete mechanical effects modeled via
+//!    `#[slot(collection, cascade)] effects: Vec<Effect>`.
+//! 3. **Effects ([`effect::Effect`])**:
+//!    Encapsulate discrete character modifications via `#[slot] operation: SheetOperation`,
+//!    which may be a fixed bonus (e.g. +2 Constitution) or a pending decision (e.g. "Choose one tool
+//!    proficiency from Brewer's Supplies, Mason's Tools, Smith's Tools").
+//!
+//! By utilizing `schematic`'s cascading slots, an unresolved character blueprint (`RaceSchematic`)
+//! can be created with open choices at any depth, navigated via visitors, and resolved into a
+//! watertight domain model (`Race`) once all choices are made.
+
+#![allow(clippy::all)]
+
 use std::fmt::Display;
 use std::str::FromStr;
 use uuid::Uuid;
@@ -22,7 +49,6 @@ pub mod skill;
 pub mod spell;
 pub mod traits;
 pub mod valueref;
-
 
 pub use inventory::{armor, item, tool, wallet, weapon};
 
@@ -60,6 +86,6 @@ impl FromStr for PlayableSheetReference {
 
 impl PlayableSheetReference {
     fn new(uuid: Uuid) -> Self {
-        Self { uuid, }
+        Self { uuid }
     }
 }

@@ -131,20 +131,24 @@ mod tests {
     #[test]
     fn source_ref_happy() {
         let tool = ToolRef::from_str("srd/tool/brewersupplies").expect("tool should be valid");
-        assert_eq!("srd", tool.0 .0);
+        assert_eq!("srd", tool.0.0);
         assert_eq!("brewersupplies", tool.1);
     }
 
     #[test]
     fn tool_one_extra_separator() {
-        assert!(ToolRef::from_str("srd/tool/brewersupplies/oops")
-            .is_err_and(|e| matches!(e, RefError::ContainsSeparator(_))))
+        assert!(
+            ToolRef::from_str("srd/tool/brewersupplies/oops")
+                .is_err_and(|e| matches!(e, RefError::ContainsSeparator(_)))
+        )
     }
 
     #[test]
     fn tool_marker_not_present() {
-        assert!(ToolRef::from_str("srd//brewersupplies")
-            .is_err_and(|e| matches!(e, RefError::InvalidRef(_))))
+        assert!(
+            ToolRef::from_str("srd//brewersupplies")
+                .is_err_and(|e| matches!(e, RefError::InvalidRef(_)))
+        )
     }
 
     #[test]

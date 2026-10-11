@@ -1,6 +1,6 @@
-use std::fmt::{Display, Formatter};
 use crate::sheet::SheetError;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::ops::AddAssign;
 
 #[derive(Deserialize, Serialize)]
@@ -67,8 +67,7 @@ impl Display for Ability {
     }
 }
 
-#[derive(Deserialize, Serialize)]
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum AbilityScoreIncrease {
     Racial {
         increase: isize,

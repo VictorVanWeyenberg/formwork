@@ -44,11 +44,14 @@ pub struct Damage {
 
 impl Damage {
     pub fn new(points: usize, damage_type: DamageType) -> Self {
-        Self { points, damage_type }
+        Self {
+            points,
+            damage_type,
+        }
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", content = "damage_type")]
 pub enum DamageModulation {
     Vulnerability(DamageType),

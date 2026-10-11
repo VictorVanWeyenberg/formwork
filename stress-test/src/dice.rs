@@ -18,16 +18,20 @@ pub enum DiceKind {
 
 impl Display for DiceKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            DiceKind::D4 => "d4",
-            DiceKind::D6 => "d6",
-            DiceKind::D8 => "d8",
-            DiceKind::D10 => "d10",
-            DiceKind::D12 => "d12",
-            DiceKind::D20 => "d20",
-            DiceKind::D100 => "d100",
-            DiceKind::C => "",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                DiceKind::D4 => "d4",
+                DiceKind::D6 => "d6",
+                DiceKind::D8 => "d8",
+                DiceKind::D10 => "d10",
+                DiceKind::D12 => "d12",
+                DiceKind::D20 => "d20",
+                DiceKind::D100 => "d100",
+                DiceKind::C => "",
+            }
+        )
     }
 }
 

@@ -1,7 +1,7 @@
+use crate::ast::{SchematicArgs, SchematicStruct};
+use ident_case::RenameRule;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use crate::ast::{SchematicStruct, SchematicArgs};
-use ident_case::RenameRule;
 
 pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStream {
     let name = &ast.ident;
@@ -17,26 +17,42 @@ pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStrea
         for field in &fields.fields {
             if field.is_slot() {
                 let field_name = field.ident.as_ref().unwrap();
-                let camel_name = RenameRule::PascalCase.apply_to_field(&field_name.to_string());
+                let camel_name = RenameRule::PascalCase.apply_to_field(field_name.to_string());
                 let mode_type_name = format_ident!("{}", camel_name);
 
                 let mut mode_bounds = Vec::new();
                 for path in &*args.derives {
-                    if let Some(segment) = path.segments.last() {
-                        if segment.ident == "Deserialize" {
-                            mode_bounds.push(quote! { for<'schematic_a> #path<'schematic_a> });
-                            continue;
-                        }
+                    if path
+                        .segments
+                        .last()
+                        .is_some_and(|segment| segment.ident == "Deserialize")
+                    {
+                        mode_bounds.push(quote! { for<'schematic_a> #path<'schematic_a> });
+                        continue;
+                    }
+                    if path.segments.len() == 1
+                        && path.segments.last().is_some_and(|s| s.ident == "Debug")
+                    {
+                        mode_bounds.push(quote! { std::fmt::Debug });
+                        continue;
+                    }
+                    if path.segments.len() == 1
+                        && path.segments.last().is_some_and(|s| s.ident == "Hash")
+                    {
+                        mode_bounds.push(quote! { std::hash::Hash });
+                        continue;
                     }
                     mode_bounds.push(quote! { #path });
                 }
-                
+
                 let config = field.slot_config().unwrap().unwrap();
 
                 if config.collection || config.pick {
                     mode_bounds.push(quote! { Default });
                     mode_bounds.push(quote! { std::iter::IntoIterator });
-                    mode_bounds.push(quote! { Extend<<Self::#mode_type_name as std::iter::IntoIterator>::Item> });
+                    mode_bounds.push(
+                        quote! { Extend<<Self::#mode_type_name as std::iter::IntoIterator>::Item> },
+                    );
                 }
 
                 let bounds_tokens = if mode_bounds.is_empty() {
@@ -67,7 +83,8 @@ pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStrea
 
                 if config.collection || config.pick {
                     unresolved_fields.push(quote! { type #mode_type_name = Vec<schematic::MultiSlot<#unresolved_inner_type, #resolved_inner_type>>; });
-                    resolved_fields.push(quote! { type #mode_type_name = Vec<#resolved_inner_type>; });
+                    resolved_fields
+                        .push(quote! { type #mode_type_name = Vec<#resolved_inner_type>; });
                 } else {
                     unresolved_fields.push(quote! { type #mode_type_name = schematic::SingleSlot<#unresolved_inner_type, #resolved_inner_type>; });
                     resolved_fields.push(quote! { type #mode_type_name = #resolved_inner_type; });
@@ -84,20 +101,25 @@ pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStrea
     };
 
     quote! {
+        #[doc(hidden)]
         pub trait #mode_trait {
             #(#mode_types)*
         }
 
+        #[doc(hidden)]
         #derives
         pub struct #unresolved_struct;
-        
+
+        #[doc(hidden)]
         #derives
         pub struct #resolved_struct;
 
+        #[doc(hidden)]
         impl #mode_trait for #unresolved_struct {
             #(#unresolved_fields)*
         }
 
+        #[doc(hidden)]
         impl #mode_trait for #resolved_struct {
             #(#resolved_fields)*
         }

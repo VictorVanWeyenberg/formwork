@@ -1,25 +1,60 @@
-//! HKD Schematic library proof of concept.
+//! Core runtime library for Higher-Kinded Data (HKD) schematic blueprints.
 //!
-//! This crate contains the manually written proof-of-concept for the macro-generated
-//! schematic architecture, demonstrating:
-//! - Localized `Mode` traits with `Unresolved` and `Resolved` mode implementations per struct.
-//! - Watertight domain types in `Resolved` mode.
-//! - Stateful `Slot` types (`Choose`, `Fixed`).
-//! - Breadth-first visitor traversal and choice selection/unmaking with history preservation.
-//! - Comprehensive abstract (`Root`/`Branch`/`Leaf`) and D&D 5e (`Race`/`Trait`/`Effect`) models.
+//! # Architecture Overview
+//!
+//! `schematic-core` provides the runtime foundations for schemas that separate an
+//! unresolved, choice-bearing blueprint from a watertight, resolved domain model.
+//!
+//! Types in this crate are strictly divided into two categories:
+//!
+//! ## 1. User-Facing Types
+//!
+//! These types form the public interface for defining, inspecting, and manipulating
+//! choices and unresolved schematics:
+//!
+//! | Type | Description |
+//! | :--- | :--- |
+//! | [`SingleChoice`] | A choice where exactly one option must be selected from a list of candidates. |
+//! | [`MultiChoice`] | A choice where multiple options are selected according to a [`Cardinality`] constraint. |
+//! | [`Cardinality`] | Specifies selection limits on multi-choices (`Exact(n)`, `UpTo(n)`, `AtLeast(n)`). |
+//! | [`Schematic`] | The primary trait implemented by unresolved blueprints (`<Name>Schematic`), providing completeness checks, resolution into watertight models, and tree traversal. |
+//! | [`ChoiceVisitor`] | Trait for implementing custom choice traversal logic across a schematic tree. |
+//! | [`VisitorFlow`] | Control flow signal (`Continue` or `Break`) returned during choice visitation. |
+//! | [`AutoSelectFirst`], [`ConfirmAll`], [`UnmakeAll`] | Built-in visitor implementations for common operations (batch selection, unmaking, re-confirming). |
+//! | [`SchematicError`] | Error type returned when choice constraints are violated or an incomplete schematic is resolved. |
+//!
+//! ### When to interact with User-Facing Types
+//! - Pass [`SingleChoice`] or [`MultiChoice`] directly to macro-generated builder methods (e.g. `.with_<field>(SingleChoice::new(...))`).
+//! - Query choice states and prompts in UI layers or interactive CLIs.
+//! - Call [`Schematic::walk_choices`] with a [`ChoiceVisitor`] to traverse, display, or automate decisions.
+//! - Call [`Schematic::resolve`] to produce the final, watertight domain model.
+//!
+//! ## 2. Internal Plumbing Types
+//!
+//! | Type | Role |
+//! | :--- | :--- |
+//! | [`Slot`], [`SingleSlot`], [`MultiSlot`] | Generic enums and type aliases storing slot data across unresolved and resolved modes. |
+//! | [`ChoiceState`] | Low-level state enum tracking index selections and unmade history. |
+//! | [`Walkable`], [`Level`] | Recursive traversal mechanics for breadth-first visitor execution. |
+//!
+//! > [!WARNING]
+//! > **Internal Plumbing Types**
+//! >
+//! > If your application code or end users ever interact directly with [`Slot`], [`SingleSlot`],
+//! > [`MultiSlot`], [`ChoiceState`], or [`Walkable`], **something is wrong in the API usage**.
+//! >
+//! > The macro-generated builder and conversion traits automatically wrap raw values and choices
+//! > into the appropriate internal slot structures. Always interact through generated builders,
+//! > user-facing choices ([`SingleChoice`], [`MultiChoice`]), and the [`Schematic`] trait.
 
 pub mod choice;
 pub mod error;
-pub mod visitor;
-pub mod slot;
 pub mod schematic_trait;
+pub mod slot;
+pub mod visitor;
 
-
-pub use choice::{SingleChoice, MultiChoice, ChoiceState, Cardinality};
+pub use choice::{Cardinality, ChoiceState, MultiChoice, SingleChoice};
 pub use error::SchematicError;
-pub use visitor::{
-    AutoSelectFirst, ChoiceVisitor,
-    ConfirmAll, UnmakeAll, VisitorFlow,
-};
-pub use slot::{Slot, SingleSlot, MultiSlot};
-pub use schematic_trait::{Schematic, Level, Walkable};
+pub use schematic_trait::{Level, Schematic, Walkable};
+pub use slot::{MultiSlot, SingleSlot, Slot};
+pub use visitor::{AutoSelectFirst, ChoiceVisitor, ConfirmAll, UnmakeAll, VisitorFlow};

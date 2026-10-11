@@ -4,7 +4,7 @@ use crate::inventory::armor::ArmorCategory;
 use crate::inventory::weapon::{WeaponCategory, WeaponRange, WeaponSimplicity};
 use crate::skill::Skill;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

@@ -14,16 +14,25 @@ pub struct Weight {
 
 impl From<usize> for Weight {
     fn from(weight: usize) -> Self {
-        Weight { weight, denominator: None }
+        Weight {
+            weight,
+            denominator: None,
+        }
     }
 }
 
 impl From<(usize, usize)> for Weight {
     fn from((weight, denominator): (usize, usize)) -> Self {
         if denominator == 1 {
-            Weight { weight, denominator: None }
+            Weight {
+                weight,
+                denominator: None,
+            }
         } else {
-            Weight { weight, denominator: Some(denominator) }
+            Weight {
+                weight,
+                denominator: Some(denominator),
+            }
         }
     }
 }
@@ -55,7 +64,8 @@ impl<'de> Deserialize<'de> for Weight {
         let weight_str = String::deserialize(deserializer).unwrap();
         let (weight, denominator) = if let Some(captures) = weight_regex.captures(&weight_str) {
             let weight = (&captures["weight"]).parse::<usize>().unwrap();
-            let denominator = captures.name("denominator")
+            let denominator = captures
+                .name("denominator")
                 .map(|m| m.as_str())
                 .map(|s| s.parse::<usize>().unwrap());
             (weight, denominator)
@@ -72,11 +82,17 @@ impl<'de> Deserialize<'de> for Weight {
 
 impl Weight {
     pub fn new(weight: usize) -> Self {
-        Self { weight, denominator: None }
+        Self {
+            weight,
+            denominator: None,
+        }
     }
 
     pub fn fractional(weight: usize, denominator: usize) -> Self {
-        Self { weight, denominator: Some(denominator) }
+        Self {
+            weight,
+            denominator: Some(denominator),
+        }
     }
 
     pub fn weight(&self) -> &usize {
@@ -98,7 +114,12 @@ pub struct Item {
 
 impl Item {
     pub fn new(name: String, description: String, cost: Cost, weight: Weight) -> Item {
-        Item { name, description, cost, weight }
+        Item {
+            name,
+            description,
+            cost,
+            weight,
+        }
     }
 
     pub fn name(&self) -> &String {

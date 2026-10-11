@@ -8,6 +8,9 @@ pub struct SpellList {
 
 impl SpellList {
     pub fn new(class: impl ToString, spells: Vec<String>) -> SpellList {
-        SpellList { class: class.to_string(), spells }
+        SpellList {
+            class: class.to_string(),
+            spells,
+        }
     }
 }

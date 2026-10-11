@@ -26,7 +26,12 @@ impl Language {
     pub fn script(&self) -> Option<Script> {
         match self {
             Language::Common | Language::Halfling => Some(Script::Common),
-            Language::Dwarvish | Language::Giant | Language::Gnomish | Language::Goblin | Language::Orc | Language::Primordial => Some(Script::Dwarvish),
+            Language::Dwarvish
+            | Language::Giant
+            | Language::Gnomish
+            | Language::Goblin
+            | Language::Orc
+            | Language::Primordial => Some(Script::Dwarvish),
             Language::Elvish | Language::Sylvan | Language::Undercommon => Some(Script::Elvish),
             Language::Abyssal | Language::Infernal => Some(Script::Infernal),
             Language::Celestial => Some(Script::Celestial),
@@ -37,8 +42,22 @@ impl Language {
 
     pub fn rareness(&self) -> LanguageRareness {
         match self {
-            Language::Common | Language::Dwarvish | Language::Elvish | Language::Giant | Language::Gnomish | Language::Goblin | Language::Halfling | Language::Orc => LanguageRareness::Standard,
-            Language::Abyssal | Language::Celestial | Language::DeepSpeech | Language::Draconic | Language::Infernal | Language::Primordial | Language::Sylvan | Language::Undercommon => LanguageRareness::Exotic,
+            Language::Common
+            | Language::Dwarvish
+            | Language::Elvish
+            | Language::Giant
+            | Language::Gnomish
+            | Language::Goblin
+            | Language::Halfling
+            | Language::Orc => LanguageRareness::Standard,
+            Language::Abyssal
+            | Language::Celestial
+            | Language::DeepSpeech
+            | Language::Draconic
+            | Language::Infernal
+            | Language::Primordial
+            | Language::Sylvan
+            | Language::Undercommon => LanguageRareness::Exotic,
         }
     }
 }

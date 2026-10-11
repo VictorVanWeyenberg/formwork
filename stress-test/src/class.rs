@@ -82,7 +82,7 @@ impl<'cl> Iterator for ClassLevelsIterator<'cl> {
             18 => Some(&self.class_levels.level18),
             19 => Some(&self.class_levels.level19),
             20 => Some(&self.class_levels.level20),
-            _ => None
+            _ => None,
         }
     }
 }

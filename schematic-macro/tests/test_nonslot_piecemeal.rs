@@ -1,5 +1,5 @@
-use schematic_macro::schematic;
 use schematic::Schematic;
+use schematic_macro::schematic;
 
 #[schematic(builder)]
 struct NonslotCollectionExample {
@@ -15,10 +15,10 @@ fn test_nonslot_piecemeal_mutators() {
         .with_items("Fixed 1".to_string())
         .with_items("Fixed 2".to_string())
         .build();
-    
+
     let resolved = example.resolve().unwrap();
-    assert_eq!(resolved.items, vec![
-        "Fixed 1".to_string(),
-        "Fixed 2".to_string(),
-    ]);
+    assert_eq!(
+        resolved.items,
+        vec!["Fixed 1".to_string(), "Fixed 2".to_string(),]
+    );
 }

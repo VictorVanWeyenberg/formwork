@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
 use crate::ability::Ability;
 use crate::condition::Condition;
 use crate::damage::{DamageDice, DamageType};
 use crate::inventory::weapon::Weapon;
 use crate::skill::Skill;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub enum Roll {
@@ -23,7 +23,7 @@ pub enum Roll {
     },
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum SavingThrowAgainst {
     DamageType(DamageType),
     Condition(Condition),
@@ -212,22 +212,22 @@ pub enum VantageStatus {
     Advantage,
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum RollDescription {
     SkillCheck(Skill),
     SavingThrow(SavingThrowKind),
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum SavingThrowKind {
     Ability(Ability),
     Against(SavingThrowAgainst),
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct VantageOnRoll {
     status: VantageStatus,
-    roll: RollDescription
+    roll: RollDescription,
 }
 
 impl VantageOnRoll {

@@ -1,8 +1,10 @@
+#![allow(clippy::all)]
+
 pub use casting_duration::*;
 pub use casting_range::*;
 pub use casting_time::*;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::hash::Hash;
 

@@ -1,9 +1,9 @@
 use crate::ability::{Abilities, AbilityScoreIncrease};
 use crate::class::ClassDto;
 use crate::proficiency::Proficiency;
+use crate::race::Race;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use crate::race::Race;
 
 #[allow(dead_code)]
 pub struct Sheet {
@@ -36,6 +36,8 @@ impl Debug for SheetError {
 
 impl SheetError {
     pub fn new(details: impl ToString) -> Self {
-        Self { details: details.to_string() }
+        Self {
+            details: details.to_string(),
+        }
     }
 }

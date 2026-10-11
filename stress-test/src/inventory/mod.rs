@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
 use crate::inventory::armor::Armor;
 use crate::inventory::item::{Item, Weight};
 use crate::inventory::tool::Tool;
 use crate::inventory::wallet::Cost;
 use crate::inventory::weapon::Weapon;
+use serde::{Deserialize, Serialize};
 
 pub mod armor;
 pub mod item;
@@ -13,9 +13,7 @@ pub mod weapon;
 
 #[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
 #[serde(transparent)]
-pub struct Pack(
-    Vec<Items>,
-);
+pub struct Pack(Vec<Items>);
 
 impl From<Vec<Items>> for Pack {
     fn from(value: Vec<Items>) -> Self {
@@ -42,8 +40,12 @@ impl Pack {
     }
 
     pub fn remove(&mut self, item: Items) -> Result<Items, String> {
-        match self.0.iter().position(|i| i == &item)
-            .map(|index| self.0.remove(index)) {
+        match self
+            .0
+            .iter()
+            .position(|i| i == &item)
+            .map(|index| self.0.remove(index))
+        {
             None => Err(format!(
                 "Unable to remove {} when you don't have any.",
                 item.name(),
@@ -53,9 +55,7 @@ impl Pack {
     }
 
     pub fn amount(&self, item: &Items) -> usize {
-        self.0.iter()
-            .filter(|i| *i == item)
-            .count()
+        self.0.iter().filter(|i| *i == item).count()
     }
 
     pub fn contains(&self, predicate: impl Fn(&Items) -> bool) -> bool {
