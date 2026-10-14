@@ -8,11 +8,11 @@
 //! 6. `#[slot(pick, cascade)]` (Pick Cascading Children with Cardinality)
 
 use schematic::{
+    Schematic, Slot,
     choice::{Cardinality, ChoiceState, MultiChoice, SingleChoice},
     error::SchematicError,
     schematic,
     visitor::AutoSelectFirst,
-    Schematic, Slot,
 };
 
 // ============================================================================
@@ -88,6 +88,9 @@ fn test_1_3_single_leaf_selected_choice_resolution() {
     assert!(!bp.is_complete());
 
     bp.weapon.as_choice_mut().unwrap().select(1).unwrap();
+    assert!(!bp.is_complete(), "select only stages candidate");
+
+    bp.weapon.as_choice_mut().unwrap().confirm().unwrap();
     assert!(bp.is_complete());
 
     let resolved = bp.resolve().unwrap();
@@ -107,19 +110,21 @@ fn test_1_4_single_leaf_unmake_and_confirm_cycle() {
         vec!["Warhammer".to_string(), "Handaxe".to_string()],
     );
     choice.select(1).unwrap();
+    choice.confirm().unwrap();
     assert!(choice.is_made());
 
     let mut bp = SingleLeafTarget::builder().id(1u32).weapon(choice).build();
     assert!(bp.is_complete());
 
-    // Unmake choice: becomes incomplete
+    // Unmake choice: becomes incomplete, preserves history 1
     bp.weapon.as_choice_mut().unwrap().unmake().unwrap();
     assert!(!bp.is_complete());
+    assert_eq!(
+        bp.weapon.as_choice_mut().unwrap().state,
+        ChoiceState::UnmadeWithHistory(1)
+    );
 
-    // With history preserved, confirm restores choice state to Made
-    bp.weapon.as_choice_mut().unwrap().state = ChoiceState::UnmadeWithHistory(vec![1]);
-    assert!(!bp.is_complete());
-
+    // Confirm restores choice state to Made
     bp.weapon.as_choice_mut().unwrap().confirm().unwrap();
     assert!(bp.is_complete());
 
@@ -166,8 +171,8 @@ fn test_2_2_collection_leaf_mutators_append() {
 }
 
 #[test]
-fn test_2_3_collection_leaf_interleaved_items_and_multichoice() {
-    let choice = MultiChoice::new("Pick 1 tag", vec!["dyn1".to_string(), "dyn2".to_string()]);
+fn test_2_3_collection_leaf_interleaved_items_and_singlechoice() {
+    let choice = SingleChoice::new("Pick 1 tag", vec!["dyn1".to_string(), "dyn2".to_string()]);
     let mut bp = CollectionLeafTarget::builder()
         .with_tags("static")
         .with_tags(choice)
@@ -179,6 +184,8 @@ fn test_2_3_collection_leaf_interleaved_items_and_multichoice() {
 
     // Select index 0 ("dyn1")
     bp.tags[1].as_choice_mut().unwrap().select(0).unwrap();
+    assert!(!bp.is_complete());
+    bp.tags[1].as_choice_mut().unwrap().confirm().unwrap();
     assert!(bp.is_complete());
 
     let resolved = bp.resolve().unwrap();
@@ -189,21 +196,23 @@ fn test_2_3_collection_leaf_interleaved_items_and_multichoice() {
 }
 
 #[test]
-fn test_2_4_collection_leaf_flattens_and_preserves_order() {
-    let choice = MultiChoice::new(
-        "Pick 2 tags",
-        vec!["mid1".to_string(), "mid2".to_string(), "mid3".to_string()],
-    )
-    .with_cardinality(Cardinality::Exact(2));
+fn test_2_4_collection_leaf_preserves_1_to_1_order() {
+    let choice1 = SingleChoice::new("Pick tag 1", vec!["mid1".to_string(), "alt1".to_string()]);
+    let choice2 = SingleChoice::new("Pick tag 2", vec!["mid2".to_string(), "alt2".to_string()]);
 
     let mut bp = CollectionLeafTarget::builder()
         .with_tags("first")
-        .with_tags(choice)
+        .with_tags(choice1)
+        .with_tags(choice2)
         .with_tags("last")
         .build();
 
     bp.tags[1].as_choice_mut().unwrap().select(0).unwrap();
-    bp.tags[1].as_choice_mut().unwrap().select(2).unwrap();
+    bp.tags[1].as_choice_mut().unwrap().confirm().unwrap();
+    assert!(!bp.is_complete());
+
+    bp.tags[2].as_choice_mut().unwrap().select(0).unwrap();
+    bp.tags[2].as_choice_mut().unwrap().confirm().unwrap();
     assert!(bp.is_complete());
 
     let resolved = bp.resolve().unwrap();
@@ -212,7 +221,7 @@ fn test_2_4_collection_leaf_flattens_and_preserves_order() {
         vec![
             "first".to_string(),
             "mid1".to_string(),
-            "mid3".to_string(),
+            "mid2".to_string(),
             "last".to_string()
         ]
     );
@@ -244,7 +253,7 @@ fn test_3_1_pick_leaf_exact_cardinality() {
 
     let mut bp = PickLeafTarget::builder()
         .max_skills(2usize)
-        .with_skills(choice)
+        .skills(choice)
         .build();
 
     // 1. Initial pending
@@ -252,11 +261,14 @@ fn test_3_1_pick_leaf_exact_cardinality() {
     assert!(bp.clone().resolve().is_err());
 
     // 2. Select index 0 ("History"): only 1 selection, still incomplete
-    bp.skills[0].as_choice_mut().unwrap().select(0).unwrap();
+    bp.skills.as_choice_mut().unwrap().select(0).unwrap();
     assert!(!bp.is_complete());
 
-    // 3. Select index 2 ("Insight"): 2 selections reached -> automatically Made
-    bp.skills[0].as_choice_mut().unwrap().select(2).unwrap();
+    // 3. Select index 2 ("Insight"): 2 selections reached, but still incomplete until confirm
+    bp.skills.as_choice_mut().unwrap().select(2).unwrap();
+    assert!(!bp.is_complete());
+
+    bp.skills.as_choice_mut().unwrap().confirm().unwrap();
     assert!(bp.is_complete());
 
     // 4. Resolve produces selected skills
@@ -301,18 +313,18 @@ fn test_3_3_pick_leaf_upto_cardinality_with_confirm() {
 
     let mut bp = PickLeafTarget::builder()
         .max_skills(3usize)
-        .with_skills(choice)
+        .skills(choice)
         .build();
 
     assert!(!bp.is_complete());
 
     // Select 1 option ("B")
-    bp.skills[0].as_choice_mut().unwrap().select(1).unwrap();
+    bp.skills.as_choice_mut().unwrap().select(1).unwrap();
     // UpTo(3) allows 1, but is not automatically Made until confirmed
     assert!(!bp.is_complete());
 
     // Confirm choice
-    bp.skills[0].as_choice_mut().unwrap().confirm().unwrap();
+    bp.skills.as_choice_mut().unwrap().confirm().unwrap();
     assert!(bp.is_complete());
 
     let resolved = bp.resolve().unwrap();
@@ -421,20 +433,19 @@ fn test_4_3_single_cascade_choice_of_child_blueprints() {
     assert!(!parent.is_complete());
     assert!(parent.clone().resolve().is_err());
 
-    // 2. Select Candidate B (index 1)
+    // 2. Select Candidate B (index 1) and confirm
     parent.child.as_choice_mut().unwrap().select(1).unwrap();
+    parent.child.as_choice_mut().unwrap().confirm().unwrap();
 
     // Pick choice is made, but Candidate B still has pending inner choice -> parent is incomplete
     assert!(!parent.is_complete());
     assert!(parent.clone().resolve().is_err());
 
     // 3. Satisfy Candidate B's inner choice
-    parent.child.as_choice_mut().unwrap().selected_values_mut()[0]
-        .value
-        .as_choice_mut()
-        .unwrap()
-        .select(0)
-        .unwrap();
+    let mut selected_cand = parent.child.as_choice_mut().unwrap().selected_values_mut();
+    let inner = selected_cand[0].value.as_choice_mut().unwrap();
+    inner.select(0).unwrap();
+    inner.confirm().unwrap();
 
     assert!(parent.is_complete());
 
@@ -521,7 +532,9 @@ fn test_5_1_collection_cascade_mixed_ready_and_pending_children() {
 
     // Satisfy Child 2's mode choice
     if let Slot::FixedUnresolved(ref mut c2) = group.systems[1] {
-        c2.mode.as_choice_mut().unwrap().select(0).unwrap();
+        let choice = c2.mode.as_choice_mut().unwrap();
+        choice.select(0).unwrap();
+        choice.confirm().unwrap();
     }
     assert!(group.is_complete());
 
@@ -601,7 +614,7 @@ fn test_6_1_pick_cascade_pool_of_candidates_with_internal_choices() {
 
     let mut party = AdventuringParty::builder()
         .party_name("Guild")
-        .with_companions(choice)
+        .companions(choice)
         .build();
 
     // 1. Initial unpicked state
@@ -609,16 +622,9 @@ fn test_6_1_pick_cascade_pool_of_candidates_with_internal_choices() {
     assert!(party.clone().resolve().is_err());
 
     // 2. Select Candidate 1 (Warrior, index 0) and Candidate 2 (Wizard, index 1)
-    party.companions[0]
-        .as_choice_mut()
-        .unwrap()
-        .select(0)
-        .unwrap();
-    party.companions[0]
-        .as_choice_mut()
-        .unwrap()
-        .select(1)
-        .unwrap();
+    party.companions.as_choice_mut().unwrap().select(0).unwrap();
+    party.companions.as_choice_mut().unwrap().select(1).unwrap();
+    party.companions.as_choice_mut().unwrap().confirm().unwrap();
 
     // Pick choice is Made, BUT selected Candidate 2 has an open inner ability choice!
     // Parent must remain incomplete (deep recursive verification).
@@ -626,17 +632,15 @@ fn test_6_1_pick_cascade_pool_of_candidates_with_internal_choices() {
     assert!(party.clone().resolve().is_err());
 
     // 3. Satisfy Candidate 2's inner choice ("Fire", index 0)
-    let mut selected_companions = party.companions[0]
+    let mut selected_companions = party
+        .companions
         .as_choice_mut()
         .unwrap()
         .selected_values_mut();
     // Index 1 in selected options is Candidate 2 (Wizard)
-    selected_companions[1]
-        .ability
-        .as_choice_mut()
-        .unwrap()
-        .select(0)
-        .unwrap();
+    let ability_choice = selected_companions[1].ability.as_choice_mut().unwrap();
+    ability_choice.select(0).unwrap();
+    ability_choice.confirm().unwrap();
 
     // Now all selected candidates are fully complete!
     assert!(party.is_complete());

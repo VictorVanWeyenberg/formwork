@@ -1,4 +1,6 @@
-use crate::choice::{MultiChoice, SingleChoice};
+use crate::choice::{Cardinality, MultiChoice, SingleChoice};
+#[cfg(doc)]
+use crate::schematic_trait::Schematic;
 
 /// Control flow signal returned by a [`ChoiceVisitor`] to govern schematic tree traversal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -12,7 +14,7 @@ pub enum VisitorFlow {
 /// A visitor for walking through and interacting with choices across a schematic hierarchy.
 ///
 /// Implement this trait to inspect, prompt, auto-select, or reset choices during traversal
-/// initiated by [`Schematic::walk_choices`](crate::Schematic::walk_choices).
+/// initiated by [`Schematic::walk_choices`].
 ///
 /// # Example
 /// ```rust
@@ -107,21 +109,22 @@ impl<T> ChoiceVisitor<T> for AutoSelectFirst {
     fn visit_single(&mut self, choice: &mut SingleChoice<T>) -> VisitorFlow {
         if !choice.is_made() && !choice.options().is_empty() {
             let _ = choice.select(0);
+            let _ = choice.confirm();
         }
         VisitorFlow::Continue
     }
 
     fn visit_multi(&mut self, choice: &mut MultiChoice<T>) -> VisitorFlow {
         if !choice.is_made() {
-            for i in 0..choice.options().len() {
-                if choice.is_made() {
-                    break;
-                }
+            let target_count = match choice.cardinality {
+                Cardinality::Exact(n) => n,
+                Cardinality::AtLeast(n) => n,
+                Cardinality::UpTo(n) => n.min(choice.options().len()),
+            };
+            for i in 0..target_count.min(choice.options().len()) {
                 let _ = choice.select(i);
             }
-            if !choice.is_made() {
-                let _ = choice.confirm();
-            }
+            let _ = choice.confirm();
         }
         VisitorFlow::Continue
     }

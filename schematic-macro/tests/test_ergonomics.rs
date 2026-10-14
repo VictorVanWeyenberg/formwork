@@ -28,11 +28,11 @@ fn test_ergonomic_builder() {
 
 #[test]
 fn test_ergonomic_builder_choice() {
-    use schematic::choice::MultiChoice;
+    use schematic::choice::SingleChoice;
 
     let mut r: ErgonomicRootSchematic = ErgonomicRoot::builder()
         .leaf("hello".to_string())
-        .with_dwarf_traits(MultiChoice::new(
+        .with_dwarf_traits(SingleChoice::new(
             "Pick",
             vec!["trait1".to_string(), "trait2".to_string()],
         ))

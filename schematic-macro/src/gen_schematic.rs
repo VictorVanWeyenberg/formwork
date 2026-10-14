@@ -17,29 +17,24 @@ pub fn generate_schematic(ast: &SchematicStruct) -> TokenStream {
 
             if field.is_slot() {
                 let config = field.slot_config().unwrap().unwrap();
-                if config.collection || config.pick {
+                if config.collection {
                     if config.cascade {
                         complete_checks.push(quote! {
                             self.#field_name.iter().all(|slot| match slot {
                                 schematic::Slot::FixedResolved(_) => true,
                                 schematic::Slot::FixedUnresolved(inner) => inner.is_complete(),
-                                schematic::Slot::Choose(choice) => choice.is_made() && choice.selected_values().iter().all(|inner| inner.is_complete()),
+                                schematic::Slot::Choose(choice) => choice.is_made() && choice.selected_value().is_some_and(|inner| inner.is_complete()),
                             })
                         });
 
                         let resolve_expr = quote! {
                             self.#field_name.into_iter()
                                 .map(|slot| match slot {
-                                    schematic::Slot::FixedResolved(resolved) => Ok(vec![resolved]),
-                                    schematic::Slot::FixedUnresolved(unresolved) => Ok(vec![unresolved.resolve()?]),
-                                    schematic::Slot::Choose(choice) => {
-                                        choice.resolve()?.into_iter().map(|inner| inner.resolve()).collect()
-                                    }
+                                    schematic::Slot::FixedResolved(r) => Ok(r),
+                                    schematic::Slot::FixedUnresolved(u) => u.resolve(),
+                                    schematic::Slot::Choose(c) => c.resolve_exact()?.resolve(),
                                 })
-                                .collect::<Result<Vec<Vec<_>>, schematic::error::SchematicError>>()?
-                                .into_iter()
-                                .flatten()
-                                .collect()
+                                .collect::<Result<Vec<_>, schematic::error::SchematicError>>()?
                         };
                         resolve_fields.push(quote! { #field_name: #resolve_expr });
                     } else {
@@ -49,11 +44,8 @@ pub fn generate_schematic(ast: &SchematicStruct) -> TokenStream {
 
                         let resolve_expr = quote! {
                             self.#field_name.into_iter()
-                                .map(|slot| slot.resolve())
+                                .map(schematic::SingleSlot::resolve_exact)
                                 .collect::<Result<Vec<_>, schematic::error::SchematicError>>()?
-                                .into_iter()
-                                .flatten()
-                                .collect()
                         };
                         resolve_fields.push(quote! { #field_name: #resolve_expr });
                     }
@@ -61,13 +53,41 @@ pub fn generate_schematic(ast: &SchematicStruct) -> TokenStream {
                     from_fields.push(quote! {
                         #field_name: value.#field_name.into_iter().map(schematic::Slot::FixedResolved).collect()
                     });
+                } else if config.pick {
+                    if config.cascade {
+                        complete_checks.push(quote! {
+                            (match &self.#field_name {
+                                schematic::Slot::FixedResolved(_) => true,
+                                schematic::Slot::FixedUnresolved(inners) => inners.iter().all(|i| i.is_complete()),
+                                schematic::Slot::Choose(choice) => choice.is_made() && choice.selected_values().iter().all(|i| i.is_complete()),
+                            })
+                        });
+
+                        let resolve_expr = quote! {
+                            match self.#field_name {
+                                schematic::Slot::FixedResolved(r) => Ok(r),
+                                schematic::Slot::FixedUnresolved(u) => u.into_iter().map(|item| item.resolve()).collect::<Result<Vec<_>, schematic::error::SchematicError>>(),
+                                schematic::Slot::Choose(c) => c.resolve()?.into_iter().map(|item| item.resolve()).collect::<Result<Vec<_>, schematic::error::SchematicError>>(),
+                            }?
+                        };
+                        resolve_fields.push(quote! { #field_name: #resolve_expr });
+                    } else {
+                        complete_checks.push(quote! { self.#field_name.is_complete() });
+
+                        let resolve_expr = quote! { self.#field_name.resolve()? };
+                        resolve_fields.push(quote! { #field_name: #resolve_expr });
+                    }
+
+                    from_fields.push(quote! {
+                        #field_name: schematic::Slot::FixedResolved(value.#field_name)
+                    });
                 } else {
                     if config.cascade {
                         complete_checks.push(quote! {
                             (match &self.#field_name {
                                 schematic::Slot::FixedResolved(_) => true,
                                 schematic::Slot::FixedUnresolved(inner) => inner.is_complete(),
-                                schematic::Slot::Choose(choice) => choice.is_made() && choice.selected_values().iter().all(|inner| inner.is_complete()),
+                                schematic::Slot::Choose(choice) => choice.is_made() && choice.selected_value().is_some_and(|inner| inner.is_complete()),
                             })
                         });
 

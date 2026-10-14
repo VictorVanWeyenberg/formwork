@@ -18,7 +18,7 @@ struct Warlock {
 #[test]
 fn test_nested_choice() {
     let mut warlock: WarlockSchematic = Warlock {
-        invocations: vec![MultiSlot::Choose(
+        invocations: MultiSlot::Choose(
             MultiChoice::new(
                 "Pick 2 Invocations",
                 vec![
@@ -34,14 +34,15 @@ fn test_nested_choice() {
                 ],
             )
             .with_cardinality(Cardinality::Exact(2)),
-        )],
+        ),
     };
 
     assert!(!warlock.is_complete());
 
-    if let Some(c) = warlock.invocations[0].as_choice_mut() {
+    if let Some(c) = warlock.invocations.as_choice_mut() {
         c.select(0).unwrap();
         c.select(2).unwrap();
+        c.confirm().unwrap();
     }
 
     assert!(warlock.is_complete());

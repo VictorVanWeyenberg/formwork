@@ -80,12 +80,12 @@ fn test_adversarial_entity_builder_and_resolution() {
             "Select role",
             vec!["Admin".to_string(), "User".to_string()],
         ))
-        .with_collection_slot(MultiChoice::new(
+        .with_collection_slot(SingleChoice::new(
             "Select permissions",
             vec!["Read".to_string(), "Write".to_string()],
         ))
         .with_collection_slot("Execute".to_string())
-        .with_pick_slot(
+        .pick_slot(
             MultiChoice::new(
                 "Pick 2 features",
                 vec!["F1".to_string(), "F2".to_string(), "F3".to_string()],

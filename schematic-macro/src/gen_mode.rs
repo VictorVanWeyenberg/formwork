@@ -47,7 +47,7 @@ pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStrea
 
                 let config = field.slot_config().unwrap().unwrap();
 
-                if config.collection || config.pick {
+                if config.collection {
                     mode_bounds.push(quote! { Default });
                     mode_bounds.push(quote! { std::iter::IntoIterator });
                     mode_bounds.push(
@@ -81,8 +81,12 @@ pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStrea
                     quote! { #base }
                 };
 
-                if config.collection || config.pick {
-                    unresolved_fields.push(quote! { type #mode_type_name = Vec<schematic::MultiSlot<#unresolved_inner_type, #resolved_inner_type>>; });
+                if config.collection {
+                    unresolved_fields.push(quote! { type #mode_type_name = Vec<schematic::SingleSlot<#unresolved_inner_type, #resolved_inner_type>>; });
+                    resolved_fields
+                        .push(quote! { type #mode_type_name = Vec<#resolved_inner_type>; });
+                } else if config.pick {
+                    unresolved_fields.push(quote! { type #mode_type_name = schematic::MultiSlot<#unresolved_inner_type, #resolved_inner_type>; });
                     resolved_fields
                         .push(quote! { type #mode_type_name = Vec<#resolved_inner_type>; });
                 } else {

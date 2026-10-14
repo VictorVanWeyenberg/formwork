@@ -18,7 +18,7 @@ fn test_builders() {
         .leaf("hi".to_string())
         .with_dwarf_traits("trait1".to_string())
         .with_dwarf_traits("trait2".to_string())
-        .with_class_skills(
+        .class_skills(
             MultiChoice::new(
                 "Pick skills",
                 vec!["A".to_string(), "B".to_string(), "C".to_string()],
@@ -29,9 +29,10 @@ fn test_builders() {
 
     assert!(!unresolved.is_complete());
 
-    if let Some(c) = unresolved.class_skills[0].as_choice_mut() {
+    if let Some(c) = unresolved.class_skills.as_choice_mut() {
         c.select(0).unwrap();
         c.select(1).unwrap();
+        c.confirm().unwrap();
     }
 
     assert!(unresolved.is_complete());

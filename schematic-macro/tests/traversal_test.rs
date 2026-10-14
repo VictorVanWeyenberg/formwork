@@ -1,6 +1,6 @@
 use schematic::choice::{ChoiceState, MultiChoice, SingleChoice};
 use schematic::visitor::{AutoSelectFirst, ChoiceVisitor, VisitorFlow};
-use schematic::{schematic, Schematic};
+use schematic::{Schematic, schematic};
 
 // ---------------------------------------------------------------------------
 // Traversal Models: BFS (Depth >= 2 Branching Tree)
@@ -344,4 +344,162 @@ fn test_13_built_in_visitors_lifecycle_dfs() {
         .resolve()
         .expect("Tree should resolve after confirm_all");
     assert_eq!(resolved_initial, resolved_restored);
+}
+
+// ---------------------------------------------------------------------------
+// Traversal Tests: Cascading Collection and Pick Verification
+// ---------------------------------------------------------------------------
+
+#[schematic(builder, traverse = "bfs")]
+#[derive(Clone, Debug, PartialEq)]
+pub struct CascadingChildBfs {
+    #[slot]
+    pub leaf: String,
+}
+
+#[schematic(builder, traverse = "bfs")]
+#[derive(Clone, Debug, PartialEq)]
+pub struct CascadingParentBfs {
+    #[slot]
+    pub root_leaf: String,
+    #[slot(collection, cascade)]
+    pub coll: Vec<CascadingChildBfs>,
+    #[slot(pick, cascade)]
+    pub pick: Vec<CascadingChildBfs>,
+}
+
+#[test]
+fn test_bfs_with_cascading_collection_and_pick() {
+    let child1 = CascadingChildBfs::builder()
+        .leaf(SingleChoice::new("CollChild1", vec!["c1".to_string()]))
+        .build();
+
+    let child2 = CascadingChildBfs::builder()
+        .leaf(SingleChoice::new("CollChild2", vec!["c2".to_string()]))
+        .build();
+
+    let coll_choice = SingleChoice::new("CollChoice2", vec![child2]);
+
+    let pick_cand1 = CascadingChildBfs::builder()
+        .leaf(SingleChoice::new("PickChild1", vec!["p1".to_string()]))
+        .build();
+
+    let pick_cand2 = CascadingChildBfs::builder()
+        .leaf(SingleChoice::new("PickChild2", vec!["p2".to_string()]))
+        .build();
+
+    let pick_choice = MultiChoice::new("PickChoice", vec![pick_cand1, pick_cand2])
+        .with_cardinality(schematic::choice::Cardinality::Exact(1));
+
+    let mut parent = CascadingParentBfs::builder()
+        .root_leaf(SingleChoice::new("RootTitle", vec!["root".to_string()]))
+        .with_coll(child1)
+        .with_coll(coll_choice)
+        .pick(pick_choice)
+        .build();
+
+    // Select candidate 0 in pick_choice and candidate 0 in coll_choice so children exist in selected
+    if let Some(c) = parent.coll[1].as_choice_mut() {
+        c.select(0).unwrap();
+        c.confirm().unwrap();
+    }
+    if let Some(p) = parent.pick.as_choice_mut() {
+        p.select(0).unwrap();
+        p.confirm().unwrap();
+    }
+
+    let mut visitor = TracingVisitor::default();
+    parent.walk_choices(&mut visitor);
+
+    // Level-order BFS visits:
+    // Level 0: "RootTitle", "CollChoice2", "PickChoice"
+    // Level 1: "CollChild1", "CollChild2", "PickChild1"
+    assert_eq!(
+        visitor.visited,
+        vec![
+            "RootTitle",
+            "CollChoice2",
+            "PickChoice",
+            "CollChild1",
+            "CollChild2",
+            "PickChild1",
+        ]
+    );
+}
+
+#[schematic(builder, traverse = "dfs")]
+#[derive(Clone, Debug, PartialEq)]
+pub struct CascadingChildDfs {
+    #[slot]
+    pub leaf: String,
+}
+
+#[schematic(builder, traverse = "dfs")]
+#[derive(Clone, Debug, PartialEq)]
+pub struct CascadingParentDfs {
+    #[slot]
+    pub root_leaf: String,
+    #[slot(collection, cascade)]
+    pub coll: Vec<CascadingChildDfs>,
+    #[slot(pick, cascade)]
+    pub pick: Vec<CascadingChildDfs>,
+}
+
+#[test]
+fn test_dfs_with_cascading_collection_and_pick() {
+    let child1 = CascadingChildDfs::builder()
+        .leaf(SingleChoice::new("CollChild1", vec!["c1".to_string()]))
+        .build();
+
+    let child2 = CascadingChildDfs::builder()
+        .leaf(SingleChoice::new("CollChild2", vec!["c2".to_string()]))
+        .build();
+
+    let coll_choice = SingleChoice::new("CollChoice2", vec![child2]);
+
+    let pick_cand1 = CascadingChildDfs::builder()
+        .leaf(SingleChoice::new("PickChild1", vec!["p1".to_string()]))
+        .build();
+
+    let pick_cand2 = CascadingChildDfs::builder()
+        .leaf(SingleChoice::new("PickChild2", vec!["p2".to_string()]))
+        .build();
+
+    let pick_choice = MultiChoice::new("PickChoice", vec![pick_cand1, pick_cand2])
+        .with_cardinality(schematic::choice::Cardinality::Exact(1));
+
+    let mut parent = CascadingParentDfs::builder()
+        .root_leaf(SingleChoice::new("RootTitle", vec!["root".to_string()]))
+        .with_coll(child1)
+        .with_coll(coll_choice)
+        .pick(pick_choice)
+        .build();
+
+    // Select candidate 0 in pick_choice and candidate 0 in coll_choice so children exist in selected
+    if let Some(c) = parent.coll[1].as_choice_mut() {
+        c.select(0).unwrap();
+        c.confirm().unwrap();
+    }
+    if let Some(p) = parent.pick.as_choice_mut() {
+        p.select(0).unwrap();
+        p.confirm().unwrap();
+    }
+
+    let mut visitor = TracingVisitor::default();
+    parent.walk_choices(&mut visitor);
+
+    // Depth-first DFS visits:
+    // Root title -> coll choices (CollChoice2) -> coll cascading children (CollChild1, CollChild2) -> pick choices (PickChoice) -> pick cascading children (PickChild1)
+    // Crucially: all coll children are visited before pick is visited!
+    assert_eq!(
+        visitor.visited,
+        vec![
+            "RootTitle",
+            "CollChoice2",
+            "CollChild1",
+            "CollChild2",
+            "PickChoice",
+            "PickChild1",
+        ]
+    );
 }

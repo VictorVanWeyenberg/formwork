@@ -39,11 +39,11 @@ pub fn generate_visitor(ast: &SchematicStruct, args: &crate::ast::SchematicArgs)
                     has_cascade = true;
                 }
 
-                if config.collection || config.pick {
+                if config.collection {
                     local_logic.push(quote! {
                         for slot in &mut self.#field_name {
                             if let schematic::Slot::Choose(choice) = slot {
-                                let flow = visitor.visit_multi(choice);
+                                let flow = visitor.visit_single(choice);
                                 if flow != schematic::VisitorFlow::Continue {
                                     return schematic::Level::from_flow(flow);
                                 }
@@ -62,7 +62,7 @@ pub fn generate_visitor(ast: &SchematicStruct, args: &crate::ast::SchematicArgs)
                                         }
                                     }
                                     if let Some(choice) = slot.as_choice_mut() {
-                                        for child in choice.selected_values_mut() {
+                                        if let Some(child) = choice.selected_value_mut() {
                                             let flow = schematic::Schematic::walk_choices(child, visitor);
                                             if flow == schematic::VisitorFlow::Break {
                                                 return schematic::Level::from_flow(flow);
@@ -81,11 +81,62 @@ pub fn generate_visitor(ast: &SchematicStruct, args: &crate::ast::SchematicArgs)
                                         }
                                     }
                                     if let Some(choice) = slot.as_choice_mut() {
-                                        for child in choice.selected_values_mut() {
+                                        if let Some(child) = choice.selected_value_mut() {
                                             level.combine(child.walk_level(visitor, depth - 1));
                                             if level.flow == schematic::VisitorFlow::Break {
                                                 return level;
                                             }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                } else if config.pick {
+                    local_logic.push(quote! {
+                        if let schematic::Slot::Choose(choice) = &mut self.#field_name {
+                            let flow = visitor.visit_multi(choice);
+                            if flow != schematic::VisitorFlow::Continue {
+                                return schematic::Level::from_flow(flow);
+                            }
+                        }
+                    });
+
+                    if config.cascade {
+                        if is_dfs {
+                            local_logic.push(quote! {
+                                if let schematic::Slot::FixedUnresolved(children) = &mut self.#field_name {
+                                    for child in children {
+                                        let flow = schematic::Schematic::walk_choices(child, visitor);
+                                        if flow == schematic::VisitorFlow::Break {
+                                            return schematic::Level::from_flow(flow);
+                                        }
+                                    }
+                                }
+                                if let Some(choice) = self.#field_name.as_choice_mut() {
+                                    for child in choice.selected_values_mut() {
+                                        let flow = schematic::Schematic::walk_choices(child, visitor);
+                                        if flow == schematic::VisitorFlow::Break {
+                                            return schematic::Level::from_flow(flow);
+                                        }
+                                    }
+                                }
+                            });
+                        } else {
+                            cascade_logic.push(quote! {
+                                if let schematic::Slot::FixedUnresolved(children) = &mut self.#field_name {
+                                    for child in children {
+                                        level.combine(child.walk_level(visitor, depth - 1));
+                                        if level.flow == schematic::VisitorFlow::Break {
+                                            return level;
+                                        }
+                                    }
+                                }
+                                if let Some(choice) = self.#field_name.as_choice_mut() {
+                                    for child in choice.selected_values_mut() {
+                                        level.combine(child.walk_level(visitor, depth - 1));
+                                        if level.flow == schematic::VisitorFlow::Break {
+                                            return level;
                                         }
                                     }
                                 }
@@ -112,7 +163,7 @@ pub fn generate_visitor(ast: &SchematicStruct, args: &crate::ast::SchematicArgs)
                                     }
                                 }
                                 if let Some(choice) = self.#field_name.as_choice_mut() {
-                                    for child in choice.selected_values_mut() {
+                                    if let Some(child) = choice.selected_value_mut() {
                                         let flow = schematic::Schematic::walk_choices(child, visitor);
                                         if flow == schematic::VisitorFlow::Break {
                                             return schematic::Level::from_flow(flow);
@@ -129,7 +180,7 @@ pub fn generate_visitor(ast: &SchematicStruct, args: &crate::ast::SchematicArgs)
                                     }
                                 }
                                 if let Some(choice) = self.#field_name.as_choice_mut() {
-                                    for child in choice.selected_values_mut() {
+                                    if let Some(child) = choice.selected_value_mut() {
                                         level.combine(child.walk_level(visitor, depth - 1));
                                         if level.flow == schematic::VisitorFlow::Break {
                                             return level;

@@ -26,7 +26,9 @@ fn main() {
         .with_traits(ability_score_increase())
         .with_traits(tool_proficiency())
         .build();
-    println!("{}", serde_json::to_string_pretty(&race).unwrap());
+    let json = serde_json::to_string_pretty(&race).unwrap();
+    println!("{}", json);
+    let _race: RaceSchematic = serde_json::from_str(&json).unwrap();
 }
 
 /// Constructs a fully resolved [`Trait`] (Dwarf Ability Score Increase: +2 Constitution)

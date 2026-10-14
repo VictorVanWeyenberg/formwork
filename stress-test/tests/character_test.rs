@@ -33,6 +33,7 @@ impl<T> ChoiceVisitor<T> for SelectOption {
             choice
                 .select(self.0)
                 .expect("failed to select choice option");
+            choice.confirm().expect("failed to confirm choice option");
         }
         VisitorFlow::Continue
     }

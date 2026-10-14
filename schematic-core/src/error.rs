@@ -1,4 +1,6 @@
 use crate::choice::Cardinality;
+#[cfg(doc)]
+use crate::choice::{MultiChoice, SingleChoice};
 use thiserror::Error;
 
 /// Errors that can occur during schematic choice manipulation, traversal, or resolution.
@@ -22,7 +24,7 @@ pub enum SchematicError {
         actual: usize,
     },
 
-    /// An option index provided to [`select`](crate::choice::SingleChoice::select) was outside the bounds of available options.
+    /// An option index provided to [`SingleChoice::select`] was outside the bounds of available options.
     #[error("`{prompt}`: option index {index} is out of bounds (total options: {total_options})")]
     IndexOutOfBounds {
         /// The prompt associated with the choice.
@@ -33,7 +35,7 @@ pub enum SchematicError {
         total_options: usize,
     },
 
-    /// The same option index was selected more than once in a [`MultiChoice`](crate::choice::MultiChoice).
+    /// The same option index was selected more than once in a [`MultiChoice`].
     #[error("`{prompt}`: option index {index} was selected more than once")]
     DuplicateSelection {
         /// The prompt associated with the choice.
@@ -47,6 +49,15 @@ pub enum SchematicError {
     CannotUnmakeNotMade {
         /// The prompt associated with the choice.
         prompt: String,
+    },
+
+    /// Attempted to unselect an option that was not currently selected.
+    #[error("`{prompt}`: option index {index} is not currently selected")]
+    NotSelected {
+        /// The prompt associated with the choice.
+        prompt: String,
+        /// The unselected index.
+        index: usize,
     },
 
     /// A custom or application-specific schematic error.

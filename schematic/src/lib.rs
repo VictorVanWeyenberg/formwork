@@ -60,11 +60,11 @@
 //! | Attribute | Field Type | Unresolved Blueprint Slot | Resolves To | Description |
 //! | :--- | :--- | :--- | :--- | :--- |
 //! | `#[slot]` | `T` | `SingleSlot<T, T>` | `T` | Single item or [`SingleChoice<T>`](crate::choice::SingleChoice). |
-//! | `#[slot(collection)]` | `Vec<T>` | `Vec<MultiSlot<T, T>>` | `Vec<T>` | Collection of items, or [`MultiChoice<T>`](crate::choice::MultiChoice). |
-//! | `#[slot(pick)]` | `Vec<T>` | `Vec<MultiSlot<T, T>>` | `Vec<T>` | Specialized collection for pick-N selections. |
+//! | `#[slot(collection)]` | `Vec<T>` | `Vec<SingleSlot<T, T>>` | `Vec<T>` | Ordered collection of individual items or [`SingleChoice<T>`](crate::choice::SingleChoice). |
+//! | `#[slot(pick)]` | `Vec<T>` | `MultiSlot<T, T>` | `Vec<T>` | Multi-selection pick slot choosing items via [`MultiChoice<T>`](crate::choice::MultiChoice). |
 //! | `#[slot(cascade)]` | `Child` | `SingleSlot<ChildSchematic, Child>` | `Child` | Cascading child schematic; resolving parent automatically resolves child. |
-//! | `#[slot(collection, cascade)]` | `Vec<Child>` | `Vec<MultiSlot<ChildSchematic, Child>>` | `Vec<Child>` | Cascading collection of child schematics. |
-//! | `#[slot(pick, cascade)]` | `Vec<Child>` | `Vec<MultiSlot<ChildSchematic, Child>>` | `Vec<Child>` | Cascading pick slot selecting child schematics subject to cardinality. |
+//! | `#[slot(collection, cascade)]` | `Vec<Child>` | `Vec<SingleSlot<ChildSchematic, Child>>` | `Vec<Child>` | Cascading collection of child schematics. |
+//! | `#[slot(pick, cascade)]` | `Vec<Child>` | `MultiSlot<ChildSchematic, Child>` | `Vec<Child>` | Cascading pick slot selecting child schematics subject to cardinality. |
 //!
 //! # Comprehensive End-to-End Example
 //!

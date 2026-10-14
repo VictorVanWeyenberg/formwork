@@ -59,7 +59,8 @@ pub fn generate_struct(
 
             if is_slot {
                 let config_val = config.as_ref().unwrap();
-                let is_coll = config_val.collection || config_val.pick;
+                let is_collection = config_val.collection;
+                let is_pick = config_val.pick;
                 let is_cascade = config_val.cascade;
 
                 let trait_name = format_ident!("Into{}{}Slot", name, camel_name);
@@ -82,13 +83,13 @@ pub fn generate_struct(
                     quote! { #base }
                 };
 
-                let slot_type = if is_coll {
+                let slot_type = if is_pick {
                     quote! { schematic::MultiSlot<#unresolved_inner_type, #resolved_inner_type> }
                 } else {
                     quote! { schematic::SingleSlot<#unresolved_inner_type, #resolved_inner_type> }
                 };
 
-                let choice_type = if is_coll {
+                let choice_type = if is_pick {
                     quote! { schematic::choice::MultiChoice<#unresolved_inner_type> }
                 } else {
                     quote! { schematic::choice::SingleChoice<#unresolved_inner_type> }
@@ -108,7 +109,7 @@ pub fn generate_struct(
                 };
 
                 let builder_attr = if args.builder {
-                    if is_coll {
+                    if is_collection {
                         quote! { #[builder(default, via_mutators)] }
                     } else {
                         quote! { #[builder(setter(#doc_setter transform = |item: impl #trait_name<M>| {
@@ -119,7 +120,7 @@ pub fn generate_struct(
                     quote! {}
                 };
 
-                let trait_def = if is_coll {
+                let trait_def = if is_collection {
                     quote! {
                         #[doc(hidden)]
                         pub trait #trait_name<M: #mode_trait> {
@@ -136,55 +137,12 @@ pub fn generate_struct(
                 };
 
                 let mut trait_impls = Vec::new();
-                let return_ty_unresolved = if is_coll {
+                let return_ty_unresolved = if is_collection {
                     quote! { #slot_type }
                 } else {
                     quote! { <#unresolved_struct as #mode_trait>::#mode_type_name }
                 };
 
-                // 1. Raw Slot object
-                trait_impls.push(quote! {
-                    #[doc(hidden)]
-                    impl #trait_name<#unresolved_struct> for #return_ty_unresolved {
-                        fn into_slot(self) -> #return_ty_unresolved {
-                            self
-                        }
-                    }
-                });
-
-                // 2. Unresolved Inner
-                trait_impls.push(quote! {
-                    #[doc(hidden)]
-                    impl #trait_name<#unresolved_struct> for #unresolved_inner_type {
-                        fn into_slot(self) -> #return_ty_unresolved {
-                            schematic::Slot::FixedUnresolved(self)
-                        }
-                    }
-                });
-
-                // 3. Resolved Inner (if cascade)
-                if is_cascade {
-                    trait_impls.push(quote! {
-                        #[doc(hidden)]
-                        impl #trait_name<#unresolved_struct> for #resolved_inner_type {
-                            fn into_slot(self) -> #return_ty_unresolved {
-                                schematic::Slot::FixedResolved(self)
-                            }
-                        }
-                    });
-                }
-
-                // 4. Choice
-                trait_impls.push(quote! {
-                    #[doc(hidden)]
-                    impl #trait_name<#unresolved_struct> for #choice_type {
-                        fn into_slot(self) -> #return_ty_unresolved {
-                            schematic::Slot::Choose(self)
-                        }
-                    }
-                });
-
-                // 5. String / &str ergonomics
                 let base = field.base_type();
                 let is_string = if let syn::Type::Path(p) = base {
                     p.path
@@ -196,37 +154,172 @@ pub fn generate_struct(
                     false
                 };
 
-                if is_string {
+                if is_pick {
+                    // Pick Slot: expects MultiSlot in unresolved mode and Vec in resolved mode
+                    // 1. Raw MultiSlot
                     trait_impls.push(quote! {
                         #[doc(hidden)]
-                        impl #trait_name<#unresolved_struct> for &str {
-                            fn into_slot(self) -> #return_ty_unresolved {
-                                schematic::Slot::FixedUnresolved(self.to_string())
+                        impl #trait_name<#unresolved_struct> for #slot_type {
+                            fn into_slot(self) -> #slot_type {
+                                self
                             }
                         }
                     });
-                }
 
-                // 6. Resolved Struct Impl
-                let return_ty_resolved = quote! { #resolved_inner_type };
-                trait_impls.push(quote! {
-                    #[doc(hidden)]
-                    impl #trait_name<#resolved_struct> for #resolved_inner_type {
-                        fn into_slot(self) -> #return_ty_resolved {
-                            self
+                    // 2. MultiChoice
+                    trait_impls.push(quote! {
+                        #[doc(hidden)]
+                        impl #trait_name<#unresolved_struct> for #choice_type {
+                            fn into_slot(self) -> #slot_type {
+                                schematic::Slot::Choose(self)
+                            }
                         }
+                    });
+
+                    // 3. Vec<#unresolved_inner_type>
+                    trait_impls.push(quote! {
+                        #[doc(hidden)]
+                        impl #trait_name<#unresolved_struct> for Vec<#unresolved_inner_type> {
+                            fn into_slot(self) -> #slot_type {
+                                schematic::Slot::FixedUnresolved(self)
+                            }
+                        }
+                    });
+
+                    // 4. Resolved Vec (if cascade)
+                    if is_cascade {
+                        trait_impls.push(quote! {
+                            #[doc(hidden)]
+                            impl #trait_name<#unresolved_struct> for Vec<#resolved_inner_type> {
+                                fn into_slot(self) -> #slot_type {
+                                    schematic::Slot::FixedResolved(self)
+                                }
+                            }
+                        });
                     }
-                });
 
-                if is_string {
+                    // 5. String slices
+                    if is_string {
+                        trait_impls.push(quote! {
+                            #[doc(hidden)]
+                            impl #trait_name<#unresolved_struct> for Vec<&str> {
+                                fn into_slot(self) -> #slot_type {
+                                    schematic::Slot::FixedUnresolved(self.into_iter().map(|s| s.to_string()).collect())
+                                }
+                            }
+                            #[doc(hidden)]
+                            impl #trait_name<#unresolved_struct> for &[&str] {
+                                fn into_slot(self) -> #slot_type {
+                                    schematic::Slot::FixedUnresolved(self.iter().map(|s| s.to_string()).collect())
+                                }
+                            }
+                        });
+                    }
+
+                    // 6. Resolved Struct Impl
+                    let return_ty_resolved = quote! { Vec<#resolved_inner_type> };
                     trait_impls.push(quote! {
                         #[doc(hidden)]
-                        impl #trait_name<#resolved_struct> for &str {
+                        impl #trait_name<#resolved_struct> for Vec<#resolved_inner_type> {
                             fn into_slot(self) -> #return_ty_resolved {
-                                self.to_string()
+                                self
                             }
                         }
                     });
+
+                    if is_string {
+                        trait_impls.push(quote! {
+                            #[doc(hidden)]
+                            impl #trait_name<#resolved_struct> for Vec<&str> {
+                                fn into_slot(self) -> #return_ty_resolved {
+                                    self.into_iter().map(|s| s.to_string()).collect()
+                                }
+                            }
+                            #[doc(hidden)]
+                            impl #trait_name<#resolved_struct> for &[&str] {
+                                fn into_slot(self) -> #return_ty_resolved {
+                                    self.iter().map(|s| s.to_string()).collect()
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    // Collection or Single Slot (both use SingleSlot)
+                    // 1. Raw Slot object
+                    trait_impls.push(quote! {
+                        #[doc(hidden)]
+                        impl #trait_name<#unresolved_struct> for #return_ty_unresolved {
+                            fn into_slot(self) -> #return_ty_unresolved {
+                                self
+                            }
+                        }
+                    });
+
+                    // 2. Unresolved Inner
+                    trait_impls.push(quote! {
+                        #[doc(hidden)]
+                        impl #trait_name<#unresolved_struct> for #unresolved_inner_type {
+                            fn into_slot(self) -> #return_ty_unresolved {
+                                schematic::Slot::FixedUnresolved(self)
+                            }
+                        }
+                    });
+
+                    // 3. Resolved Inner (if cascade)
+                    if is_cascade {
+                        trait_impls.push(quote! {
+                            #[doc(hidden)]
+                            impl #trait_name<#unresolved_struct> for #resolved_inner_type {
+                                fn into_slot(self) -> #return_ty_unresolved {
+                                    schematic::Slot::FixedResolved(self)
+                                }
+                            }
+                        });
+                    }
+
+                    // 4. Choice
+                    trait_impls.push(quote! {
+                        #[doc(hidden)]
+                        impl #trait_name<#unresolved_struct> for #choice_type {
+                            fn into_slot(self) -> #return_ty_unresolved {
+                                schematic::Slot::Choose(self)
+                            }
+                        }
+                    });
+
+                    // 5. String / &str ergonomics
+                    if is_string {
+                        trait_impls.push(quote! {
+                            #[doc(hidden)]
+                            impl #trait_name<#unresolved_struct> for &str {
+                                fn into_slot(self) -> #return_ty_unresolved {
+                                    schematic::Slot::FixedUnresolved(self.to_string())
+                                }
+                            }
+                        });
+                    }
+
+                    // 6. Resolved Struct Impl
+                    let return_ty_resolved = quote! { #resolved_inner_type };
+                    trait_impls.push(quote! {
+                        #[doc(hidden)]
+                        impl #trait_name<#resolved_struct> for #resolved_inner_type {
+                            fn into_slot(self) -> #return_ty_resolved {
+                                self
+                            }
+                        }
+                    });
+
+                    if is_string {
+                        trait_impls.push(quote! {
+                            #[doc(hidden)]
+                            impl #trait_name<#resolved_struct> for &str {
+                                fn into_slot(self) -> #return_ty_resolved {
+                                    self.to_string()
+                                }
+                            }
+                        });
+                    }
                 }
 
                 slot_traits.push(quote! {
@@ -234,34 +327,34 @@ pub fn generate_struct(
                     #(#trait_impls)*
                 });
 
-                if args.builder && is_coll {
+                if args.builder && is_collection {
                     let fn_name = format_ident!("with_{}", field_name);
                     let unresolved_inner_type_str = quote!(#unresolved_inner_type).to_string();
 
                     let with_fn_doc = if !doc_lines.is_empty() {
                         format!(
-                            "Appends a single item, choice, or slot to `{}`.\n\n{}\n\n# Accepted Values\n- Raw item (`{}`)\n- [`MultiChoice`](schematic::choice::MultiChoice)\n- [`MultiSlot`](schematic::MultiSlot)",
+                            "Appends a single item, choice, or slot to `{}`.\n\n{}\n\n# Accepted Values\n- Raw item (`{}`)\n- [`SingleChoice`](schematic::choice::SingleChoice)\n- [`SingleSlot`](schematic::SingleSlot)",
                             field_name,
                             doc_lines.join("\n"),
                             unresolved_inner_type_str
                         )
                     } else {
                         format!(
-                            "Appends a single item, choice, or slot to `{}`.\n\n# Accepted Values\n- Raw item (`{}`)\n- [`MultiChoice`](schematic::choice::MultiChoice)\n- [`MultiSlot`](schematic::MultiSlot)",
+                            "Appends a single item, choice, or slot to `{}`.\n\n# Accepted Values\n- Raw item (`{}`)\n- [`SingleChoice`](schematic::choice::SingleChoice)\n- [`SingleSlot`](schematic::SingleSlot)",
                             field_name, unresolved_inner_type_str
                         )
                     };
 
                     let iter_fn_doc = if !doc_lines.is_empty() {
                         format!(
-                            "Appends an iterator of items, choices, or slots to `{}`.\n\n{}\n\n# Accepted Values\nAn iterator yielding:\n- Raw items (`{}`)\n- [`MultiChoice`](schematic::choice::MultiChoice)\n- [`MultiSlot`](schematic::MultiSlot)",
+                            "Appends an iterator of items, choices, or slots to `{}`.\n\n{}\n\n# Accepted Values\nAn iterator yielding:\n- Raw items (`{}`)\n- [`SingleChoice`](schematic::choice::SingleChoice)\n- [`SingleSlot`](schematic::SingleSlot)",
                             field_name,
                             doc_lines.join("\n"),
                             unresolved_inner_type_str
                         )
                     } else {
                         format!(
-                            "Appends an iterator of items, choices, or slots to `{}`.\n\n# Accepted Values\nAn iterator yielding:\n- Raw items (`{}`)\n- [`MultiChoice`](schematic::choice::MultiChoice)\n- [`MultiSlot`](schematic::MultiSlot)",
+                            "Appends an iterator of items, choices, or slots to `{}`.\n\n# Accepted Values\nAn iterator yielding:\n- Raw items (`{}`)\n- [`SingleChoice`](schematic::choice::SingleChoice)\n- [`SingleSlot`](schematic::SingleSlot)",
                             field_name, unresolved_inner_type_str
                         )
                     };

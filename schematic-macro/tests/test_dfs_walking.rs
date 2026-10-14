@@ -1,5 +1,5 @@
 use schematic::choice::{MultiChoice, SingleChoice};
-use schematic::slot::{MultiSlot, SingleSlot};
+use schematic::slot::SingleSlot;
 use schematic::{ChoiceVisitor, Schematic, VisitorFlow};
 use schematic_macro::schematic;
 
@@ -107,7 +107,7 @@ fn test_walk_choices_dfs_and_mutation() {
             }),
             n2: SingleChoice::new("n2", vec!["right.n2".to_string()]).into(),
         }),
-        list: vec![MultiSlot::FixedUnresolved(NodeSchematic {
+        list: vec![SingleSlot::FixedUnresolved(NodeSchematic {
             n1: SingleChoice::new("n1", vec!["list0.n1".to_string()]).into(),
             child: SingleSlot::FixedUnresolved(LeafSchematic {
                 c1: SingleChoice::new("c1", vec!["list0.child.c1".to_string()]).into(),

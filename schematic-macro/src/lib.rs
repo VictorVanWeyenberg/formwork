@@ -79,11 +79,11 @@ mod gen_visitor;
 /// | Slot Attribute | Field Type | Unresolved Blueprint Slot Type | Resolves To | Description |
 /// | :--- | :--- | :--- | :--- | :--- |
 /// | `#[slot]` | `T` | `SingleSlot<T, T>` | `T` | Single slot for a non-schematic type. Accepts `T` or `SingleChoice<T>`. |
-/// | `#[slot(collection)]` | `Vec<T>` | `Vec<MultiSlot<T, T>>` | `Vec<T>` | Collection slot for non-schematic items. Accepts individual items, `MultiChoice<T>`, or `MultiSlot`. |
-/// | `#[slot(pick)]` | `Vec<T>` | `Vec<MultiSlot<T, T>>` | `Vec<T>` | Pick slot for selecting multiple items from candidates according to cardinality. |
+/// | `#[slot(collection)]` | `Vec<T>` | `Vec<SingleSlot<T, T>>` | `Vec<T>` | Collection slot for non-schematic items. Accepts individual items, `SingleChoice<T>`, or `SingleSlot`. |
+/// | `#[slot(pick)]` | `Vec<T>` | `MultiSlot<T, T>` | `Vec<T>` | Pick slot for selecting multiple items from candidates according to cardinality. Accepts `MultiChoice<T>` or `MultiSlot`. |
 /// | `#[slot(cascade)]` | `Child` | `SingleSlot<ChildSchematic, Child>` | `Child` | Cascading single slot for a nested schematic type. Resolves the child when the parent resolves. |
-/// | `#[slot(collection, cascade)]` | `Vec<Child>` | `Vec<MultiSlot<ChildSchematic, Child>>` | `Vec<Child>` | Cascading collection slot for nested schematic types. Recursively resolves all children. |
-/// | `#[slot(pick, cascade)]` | `Vec<Child>` | `Vec<MultiSlot<ChildSchematic, Child>>` | `Vec<Child>` | Cascading pick slot selecting child schematics subject to cardinality. |
+/// | `#[slot(collection, cascade)]` | `Vec<Child>` | `Vec<SingleSlot<ChildSchematic, Child>>` | `Vec<Child>` | Cascading collection slot for nested schematic types. Recursively resolves all children. |
+/// | `#[slot(pick, cascade)]` | `Vec<Child>` | `MultiSlot<ChildSchematic, Child>` | `Vec<Child>` | Cascading pick slot selecting child schematics subject to cardinality. |
 ///
 /// # End-to-End Walkthrough Example
 ///

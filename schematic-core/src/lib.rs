@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 //! Core runtime library for Higher-Kinded Data (HKD) schematic blueprints.
 //!
 //! # Architecture Overview
@@ -47,10 +49,15 @@
 //! > into the appropriate internal slot structures. Always interact through generated builders,
 //! > user-facing choices ([`SingleChoice`], [`MultiChoice`]), and the [`Schematic`] trait.
 
+/// Choice abstractions, state machines, and cardinality constraints.
 pub mod choice;
+/// Error types returned during schematic choice manipulation and resolution.
 pub mod error;
+/// Traits and level structures defining schematic behavior and traversal.
 pub mod schematic_trait;
+/// Internal slot representations and containers.
 pub mod slot;
+/// Visitor pattern implementation for inspecting and manipulating choices.
 pub mod visitor;
 
 pub use choice::{Cardinality, ChoiceState, MultiChoice, SingleChoice};

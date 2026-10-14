@@ -4,11 +4,7 @@
 //! - Test Case 9: Derives & Serde JSON Roundtrips
 //! - Test Case 10: Doc Comment Preservation
 
-use schematic::{
-    choice::{MultiChoice, SingleChoice},
-    visitor::AutoSelectFirst,
-    Schematic, Slot,
-};
+use schematic::{Schematic, Slot, choice::SingleChoice, visitor::AutoSelectFirst};
 use schematic_macro::schematic;
 
 // ============================================================================
@@ -36,7 +32,7 @@ fn test_manual_struct_instantiation_without_builder() {
         )),
         items: vec![
             Slot::FixedUnresolved("I1".to_string()),
-            Slot::Choose(MultiChoice::new(
+            Slot::Choose(SingleChoice::new(
                 "Pick items",
                 vec!["I2".to_string(), "I3".to_string()],
             )),
@@ -190,8 +186,8 @@ fn test_serde_json_roundtrip_pending_and_resolved() {
 mod documented_module {
     #![deny(missing_docs)]
 
-    use schematic::choice::SingleChoice;
     use schematic::Schematic;
+    use schematic::choice::SingleChoice;
     use schematic_macro::schematic;
 
     /// Root entity doc comment documenting the primary record.

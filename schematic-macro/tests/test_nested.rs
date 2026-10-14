@@ -1,5 +1,5 @@
 use schematic::Schematic;
-use schematic::slot::{MultiSlot, SingleSlot};
+use schematic::slot::SingleSlot;
 use schematic_macro::schematic;
 
 #[schematic]
@@ -22,7 +22,7 @@ fn test_nested_schematics() {
         leaf: SingleSlot::FixedUnresolved(LeafSchematic {
             name: SingleSlot::FixedUnresolved("Leaf1".to_string()),
         }),
-        leafs: vec![MultiSlot::FixedUnresolved(LeafSchematic {
+        leafs: vec![SingleSlot::FixedUnresolved(LeafSchematic {
             name: SingleSlot::FixedUnresolved("Leaf2".to_string()),
         })],
     };
