@@ -15,12 +15,10 @@ pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStrea
 
     if let darling::ast::Data::Struct(fields) = &ast.data {
         for field in &fields.fields {
-            if field.is_slot() {
+            if let Some(config) = field.slot_config().unwrap() {
                 let field_name = field.ident.as_ref().unwrap();
                 let camel_name = RenameRule::PascalCase.apply_to_field(field_name.to_string());
                 let mode_type_name = format_ident!("{}", camel_name);
-
-                let config = field.slot_config().unwrap().unwrap();
 
                 let bounds_tokens = if config.collection {
                     quote! {
@@ -34,23 +32,8 @@ pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStrea
 
                 mode_types.push(quote! { type #mode_type_name #bounds_tokens; });
 
-                let unresolved_inner_type = if config.cascade {
-                    let base = field.base_type();
-                    let unresolved_inner_mode = crate::ast::unresolved_mode_type(base).unwrap();
-                    quote! { #base<#unresolved_inner_mode> }
-                } else {
-                    let base = field.base_type();
-                    quote! { #base }
-                };
-
-                let resolved_inner_type = if config.cascade {
-                    let base = field.base_type();
-                    let resolved_inner_mode = crate::ast::resolved_mode_type(base).unwrap();
-                    quote! { #base<#resolved_inner_mode> }
-                } else {
-                    let base = field.base_type();
-                    quote! { #base }
-                };
+                let unresolved_inner_type = field.unresolved_inner_type(config.cascade);
+                let resolved_inner_type = field.resolved_inner_type(config.cascade);
 
                 if config.collection {
                     unresolved_fields.push(quote! { type #mode_type_name = Vec<schematic::SingleSlot<#unresolved_inner_type, #resolved_inner_type>>; });

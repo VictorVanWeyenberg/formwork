@@ -17,16 +17,8 @@ pub fn generate_visitor(ast: &SchematicStruct, args: &crate::ast::SchematicArgs)
         for field in &fields.fields {
             let field_name = field.ident.as_ref().unwrap();
 
-            if field.is_slot() {
-                let config = field.slot_config().unwrap().unwrap();
-                let unresolved_inner_type = if config.cascade {
-                    let base = field.base_type();
-                    let unresolved_inner_mode = crate::ast::unresolved_mode_type(base).unwrap();
-                    quote! { #base<#unresolved_inner_mode> }
-                } else {
-                    let base = field.base_type();
-                    quote! { #base }
-                };
+            if let Some(config) = field.slot_config().unwrap() {
+                let unresolved_inner_type = field.unresolved_inner_type(config.cascade);
 
                 visitor_bounds.push(quote! {
                     V: schematic::ChoiceVisitor<#unresolved_inner_type>

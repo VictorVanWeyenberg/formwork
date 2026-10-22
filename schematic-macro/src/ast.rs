@@ -97,12 +97,34 @@ impl SchematicField {
     }
 
     pub fn base_type(&self) -> &Type {
-        let is_collection_field = self.inner_type_if_vec().is_some();
-        if is_collection_field {
-            self.inner_type_if_vec().unwrap()
+        self.inner_type_if_vec().unwrap_or(&self.ty)
+    }
+
+    pub fn unresolved_inner_type(&self, cascade: bool) -> proc_macro2::TokenStream {
+        let base = self.base_type();
+        if cascade {
+            let mode = unresolved_mode_type(base).unwrap();
+            quote::quote! { #base<#mode> }
         } else {
-            &self.ty
+            quote::quote! { #base }
         }
+    }
+
+    pub fn resolved_inner_type(&self, cascade: bool) -> proc_macro2::TokenStream {
+        let base = self.base_type();
+        if cascade {
+            let mode = resolved_mode_type(base).unwrap();
+            quote::quote! { #base<#mode> }
+        } else {
+            quote::quote! { #base }
+        }
+    }
+
+    pub fn is_string_base_type(&self) -> bool {
+        matches!(
+            self.base_type(),
+            Type::Path(p) if p.path.segments.last().is_some_and(|s| s.ident == "String")
+        )
     }
 
     pub fn inner_type_if_vec(&self) -> Option<&Type> {
