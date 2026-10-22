@@ -9,7 +9,7 @@ use std::fmt::{Display, Formatter};
 ///
 /// Models the top-level racial identity. Traits are modeled as a cascading collection slot
 /// (`#[slot(collection, cascade)]`), allowing traits to contain choices that cascade downward.
-#[schematic(builder, derives(Clone, Debug, PartialEq, Serialize, Deserialize))]
+#[schematic(builder)]
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Race {

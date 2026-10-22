@@ -124,14 +124,14 @@ pub fn generate_struct(
                     quote! {
                         #[doc(hidden)]
                         pub trait #trait_name<M: #mode_trait> {
-                            fn into_slot(self) -> <<M as #mode_trait>::#mode_type_name as std::iter::IntoIterator>::Item;
+                            fn into_slot(self) -> <M::#mode_type_name as std::iter::IntoIterator>::Item;
                         }
                     }
                 } else {
                     quote! {
                         #[doc(hidden)]
                         pub trait #trait_name<M: #mode_trait> {
-                            fn into_slot(self) -> <M as #mode_trait>::#mode_type_name;
+                            fn into_slot(self) -> M::#mode_type_name;
                         }
                     }
                 };
@@ -379,7 +379,7 @@ pub fn generate_struct(
                 struct_fields.push(quote! {
                     #(#field_attrs)*
                     #builder_attr
-                    #vis #field_name: <M as #mode_trait>::#mode_type_name,
+                    #vis #field_name: M::#mode_type_name,
                 });
             } else {
                 let ty = &field.ty;
@@ -450,6 +450,7 @@ pub fn generate_struct(
             }
         } else {
             quote! {
+                #[schematic::__qualify_mode(#mode_trait)]
                 #[derive(typed_builder::TypedBuilder)]
                 #[builder(doc)]
                 #[builder(mutators(

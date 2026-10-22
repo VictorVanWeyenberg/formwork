@@ -20,45 +20,16 @@ pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStrea
                 let camel_name = RenameRule::PascalCase.apply_to_field(field_name.to_string());
                 let mode_type_name = format_ident!("{}", camel_name);
 
-                let mut mode_bounds = Vec::new();
-                for path in &*args.derives {
-                    if path
-                        .segments
-                        .last()
-                        .is_some_and(|segment| segment.ident == "Deserialize")
-                    {
-                        mode_bounds.push(quote! { for<'schematic_a> #path<'schematic_a> });
-                        continue;
-                    }
-                    if path.segments.len() == 1
-                        && path.segments.last().is_some_and(|s| s.ident == "Debug")
-                    {
-                        mode_bounds.push(quote! { std::fmt::Debug });
-                        continue;
-                    }
-                    if path.segments.len() == 1
-                        && path.segments.last().is_some_and(|s| s.ident == "Hash")
-                    {
-                        mode_bounds.push(quote! { std::hash::Hash });
-                        continue;
-                    }
-                    mode_bounds.push(quote! { #path });
-                }
-
                 let config = field.slot_config().unwrap().unwrap();
 
-                if config.collection {
-                    mode_bounds.push(quote! { Default });
-                    mode_bounds.push(quote! { std::iter::IntoIterator });
-                    mode_bounds.push(
-                        quote! { Extend<<Self::#mode_type_name as std::iter::IntoIterator>::Item> },
-                    );
-                }
-
-                let bounds_tokens = if mode_bounds.is_empty() {
-                    quote! {}
+                let bounds_tokens = if config.collection {
+                    quote! {
+                        : Default
+                            + std::iter::IntoIterator
+                            + Extend<<Self::#mode_type_name as std::iter::IntoIterator>::Item>
+                    }
                 } else {
-                    quote! { : #(#mode_bounds)+* }
+                    quote! {}
                 };
 
                 mode_types.push(quote! { type #mode_type_name #bounds_tokens; });

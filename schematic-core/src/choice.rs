@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display, Formatter};
 
 /// Specifies selection bounds and constraints for a [`MultiChoice`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Cardinality {
     /// Up to `n` options may be selected ($0 \le k \le n$).
     UpTo(usize),
@@ -122,7 +122,7 @@ impl Display for Cardinality {
 /// Stores staged selections and previous history generically via `H`:
 /// - [`SingleChoice`] instantiates `ChoiceState<usize>` (stack-only scalar, zero heap allocations).
 /// - [`MultiChoice`] instantiates `ChoiceState<Vec<usize>>` (dynamic collection of selected indices).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ChoiceState<H> {
     /// Choice is open; no selections have been staged or made.
     #[default]
@@ -165,7 +165,7 @@ fn is_default_state<H>(s: &ChoiceState<H>) -> bool {
 /// A user-facing choice where exactly one option must be selected and confirmed.
 ///
 /// Operates on stack-only `ChoiceState<usize>` with zero heap allocation overhead.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SingleChoice<T> {
     /// The user-facing question or prompt describing this choice.
     pub prompt: String,
@@ -414,7 +414,7 @@ fn is_default_cardinality(c: &Cardinality) -> bool {
 }
 
 /// A user-facing choice where multiple options may be picked subject to a [`Cardinality`] constraint.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct MultiChoice<T> {
     /// The user-facing question or prompt describing this choice.
     pub prompt: String,

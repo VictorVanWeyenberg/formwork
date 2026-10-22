@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 /// Internal plumbing: generic container representing a slot in an unresolved schematic.
 ///
 /// Holds either a choice `C`, an unresolved value `U`, or a pre-resolved value `R`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Slot<U, R, C> {
     /// Slot contains a choice `C` waiting to be resolved.

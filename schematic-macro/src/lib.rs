@@ -51,8 +51,9 @@ mod gen_visitor;
 ///   (iterator of items, choices, or slots) mutator methods.
 /// - `traverse = "bfs"` (default) or `"dfs"`: Specifies the tree traversal strategy used when
 ///   calling `walk_choices`.
-/// - `derives(...)`: Specifies derive macros (e.g. `Clone`, `PartialEq`, `Serialize`, `Deserialize`)
-///   to apply to internal mode markers and helper types.
+/// - `derives(...)`: Optionally specifies additional derive macros (e.g. `Clone`, `PartialEq`,
+///   `Serialize`, `Deserialize`) to apply to internal mode marker types. Any `#[derive(...)]`
+///   attributes placed directly on the struct are forwarded automatically.
 ///
 /// # Slot Decision Criteria
 ///
@@ -186,3 +187,24 @@ pub fn schematic(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     expanded.into()
 }
+
+#[doc(hidden)]
+#[proc_macro_attribute]
+pub fn __qualify_mode(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mode_trait = parse_macro_input!(attr as syn::Ident);
+    let mut item_struct = parse_macro_input!(item as DeriveInput);
+    if let syn::Data::Struct(ref mut data_struct) = item_struct.data {
+        for field in &mut data_struct.fields {
+            if let syn::Type::Path(ref type_path) = field.ty
+                && type_path.qself.is_none()
+                && type_path.path.segments.len() == 2
+                && type_path.path.segments[0].ident == "M"
+            {
+                let assoc = &type_path.path.segments[1].ident;
+                field.ty = syn::parse_quote!(<M as #mode_trait>::#assoc);
+            }
+        }
+    }
+    quote::quote!(#item_struct).into()
+}
+

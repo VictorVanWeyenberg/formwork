@@ -665,3 +665,141 @@ fn test_6_1_pick_cascade_pool_of_candidates_with_internal_choices() {
         }
     );
 }
+
+// ============================================================================
+// 7. Standard Derives & Serde Across All 6 Slot Kinds (Without Trait Imports)
+// ============================================================================
+
+#[schematic(builder)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub struct DeriveChild {
+    pub id: String,
+    #[slot]
+    pub item: String,
+}
+
+#[schematic(builder)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub struct AllSlotKindsDeriveTarget {
+    pub label: String,
+    #[slot]
+    pub single_leaf: String,
+    #[slot(collection)]
+    pub collection_leaf: Vec<String>,
+    #[slot(pick)]
+    pub pick_leaf: Vec<String>,
+    #[slot(cascade)]
+    pub single_cascade: DeriveChild,
+    #[slot(collection, cascade)]
+    pub collection_cascade: Vec<DeriveChild>,
+    #[slot(pick, cascade)]
+    pub pick_cascade: Vec<DeriveChild>,
+}
+
+#[schematic(
+    builder,
+    derives(
+        Clone,
+        Debug,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
+        Hash,
+        serde::Serialize,
+        serde::Deserialize
+    )
+)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub struct ExplicitDerivesBackwardsCompat {
+    #[slot]
+    pub name: String,
+}
+
+#[test]
+fn test_7_1_all_derives_on_all_six_slot_kinds_resolved_and_unresolved() {
+    use std::collections::{BTreeSet, HashSet};
+
+    let child_a: DeriveChildSchematic = DeriveChild::builder().id("A").item("Sword").build();
+    let child_b = DeriveChild::builder()
+        .id("B")
+        .item(SingleChoice::new(
+            "Pick shield",
+            vec!["Buckler".to_string(), "Kite".to_string()],
+        ))
+        .build();
+    let child_c = DeriveChild::builder().id("C").item("Helm").build();
+
+    let mut bp: AllSlotKindsDeriveTargetSchematic = AllSlotKindsDeriveTarget::builder()
+        .label("Hero")
+        .single_leaf(SingleChoice::new(
+            "Class",
+            vec!["Paladin".to_string(), "Ranger".to_string()],
+        ))
+        .with_collection_leaf("Torch")
+        .pick_leaf(
+            MultiChoice::new("Skills", vec!["Athletics".to_string(), "Stealth".to_string()])
+                .with_cardinality(Cardinality::Exact(1)),
+        )
+        .single_cascade(child_a)
+        .with_collection_cascade(child_b)
+        .pick_cascade(
+            MultiChoice::new("Companions", vec![child_c]).with_cardinality(Cardinality::Exact(1)),
+        )
+        .build();
+
+    // Verify Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize on unresolved blueprint
+    let bp_cloned = bp.clone();
+    assert_eq!(bp, bp_cloned);
+    assert!(!format!("{bp:?}").is_empty());
+
+    let mut bp_hash_set = HashSet::new();
+    bp_hash_set.insert(bp.clone());
+    assert!(bp_hash_set.contains(&bp_cloned));
+
+    let mut bp_btree_set = BTreeSet::new();
+    bp_btree_set.insert(bp.clone());
+    assert!(bp_btree_set.contains(&bp_cloned));
+
+    let bp_json = serde_json::to_string(&bp).unwrap();
+    let bp_roundtrip: AllSlotKindsDeriveTargetSchematic = serde_json::from_str(&bp_json).unwrap();
+    assert_eq!(bp, bp_roundtrip);
+
+    // Satisfy all choices and resolve
+    bp.walk_choices(&mut AutoSelectFirst);
+    assert!(bp.is_complete());
+    let resolved: AllSlotKindsDeriveTarget = bp.resolve().unwrap();
+
+    // Verify Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize on resolved struct
+    let resolved_cloned = resolved.clone();
+    assert_eq!(resolved, resolved_cloned);
+    assert!(!format!("{resolved:?}").is_empty());
+
+    let mut resolved_hash_set = HashSet::new();
+    resolved_hash_set.insert(resolved.clone());
+    assert!(resolved_hash_set.contains(&resolved_cloned));
+
+    let mut resolved_btree_set = BTreeSet::new();
+    resolved_btree_set.insert(resolved.clone());
+    assert!(resolved_btree_set.contains(&resolved_cloned));
+
+    let resolved_json = serde_json::to_string(&resolved).unwrap();
+    let resolved_roundtrip: AllSlotKindsDeriveTarget =
+        serde_json::from_str(&resolved_json).unwrap();
+    assert_eq!(resolved, resolved_roundtrip);
+
+    // Verify backwards compatibility with explicit #[schematic(derives(...))]
+    let compat_bp = ExplicitDerivesBackwardsCompat::builder()
+        .name("Test")
+        .build();
+    let compat_resolved = compat_bp.clone().resolve().unwrap();
+    assert_eq!(compat_bp, compat_bp.clone());
+    assert_eq!(compat_resolved.name, "Test");
+}
+

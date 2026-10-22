@@ -34,7 +34,7 @@ impl EffectId {
 /// `Effect` serves as the leaf node in the schematic tree. Its `operation` field is a single
 /// slot (`#[slot]`), allowing it to hold either a fixed resolved operation (such as +2 Constitution)
 /// or a choice (such as "Choose one tool proficiency from Brewer's Supplies, Mason's Tools, Smith's Tools").
-#[schematic(builder, derives(Clone, Debug, Serialize, Deserialize, PartialEq))]
+#[schematic(builder)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Effect {
     /// Optional identifier for tracking or removing effects.

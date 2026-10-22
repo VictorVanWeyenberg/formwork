@@ -9,7 +9,7 @@ use serde_with::serde_as;
 /// Traits group one or more mechanical effects together under a common title and description.
 /// The `effects` field is a cascading collection slot (`#[slot(collection, cascade)]`),
 /// allowing child effects with choices to be resolved hierarchically.
-#[schematic(builder, derives(Clone, Debug, Serialize, Deserialize, PartialEq))]
+#[schematic(builder)]
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Trait {
