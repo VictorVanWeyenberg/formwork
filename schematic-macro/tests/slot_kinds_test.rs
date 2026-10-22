@@ -941,3 +941,72 @@ fn test_8_3_qualified_std_derives_and_default_on_blueprint_and_resolved() {
     btree.insert(built.clone());
     assert!(btree.contains(&built));
 }
+
+/// Struct with multi-line doc comments across all 4 field generator branches
+/// (regular scalar, regular Vec, single/pick slot, and collection slot) to verify
+/// `extract_doc_comments` and `format_doc_with_details`, as well as direct resolved-mode building.
+#[schematic(builder)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct DocumentedAndResolvedBuilderTarget {
+    /// Primary identifier for the configuration.
+    /// Must be non-empty.
+    pub id: String,
+    /// Static labels attached to the configuration.
+    /// Preserves insertion order.
+    pub static_labels: Vec<String>,
+    /// Primary role selection.
+    /// Supports string slice ergonomics.
+    #[slot]
+    pub role: String,
+    /// Ordered list of equipment items.
+    /// Supports piecemeal `with_equipment` and batch `equipment`.
+    #[slot(collection)]
+    pub equipment: Vec<String>,
+    /// Selected bonus perks.
+    /// Supports `Vec<&str>` and `&[&str]` slice conversions.
+    #[slot(pick)]
+    pub perks: Vec<String>,
+}
+
+#[test]
+fn test_8_4_documented_fields_and_resolved_mode_builder_ergonomics() {
+    let perk_slice: &[&str] = &["PerkA", "PerkB"];
+
+    // Build directly in Unresolved mode using &[&str] on pick slot and iterator mutator on collection slot
+    let bp: DocumentedAndResolvedBuilderTargetSchematic =
+        DocumentedAndResolvedBuilderTarget::builder()
+            .id("cfg-1")
+            .with_static_labels("v1")
+            .role("Tank")
+            .with_equipment("Shield")
+            .equipment(["Armor", "Boots"])
+            .perks(perk_slice)
+            .build();
+    assert!(bp.is_complete());
+    let resolved_from_bp = bp.resolve().unwrap();
+
+    // Build directly in Resolved mode (DocumentedAndResolvedBuilderTarget<DocumentedAndResolvedBuilderTargetResolved>)
+    let direct_resolved: DocumentedAndResolvedBuilderTarget =
+        DocumentedAndResolvedBuilderTarget::builder()
+            .id("cfg-1")
+            .with_static_labels("v1")
+            .role("Tank")
+            .with_equipment("Shield")
+            .equipment(["Armor", "Boots"])
+            .perks(vec!["PerkA", "PerkB"])
+            .build();
+
+    assert_eq!(resolved_from_bp, direct_resolved);
+
+    // Also test &[&str] in Resolved mode
+    let direct_resolved_slice: DocumentedAndResolvedBuilderTarget =
+        DocumentedAndResolvedBuilderTarget::builder()
+            .id("cfg-1")
+            .with_static_labels("v1")
+            .role("Tank")
+            .with_equipment("Shield")
+            .equipment(["Armor", "Boots"])
+            .perks(perk_slice)
+            .build();
+    assert_eq!(direct_resolved, direct_resolved_slice);
+}
