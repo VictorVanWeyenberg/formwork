@@ -465,7 +465,10 @@ fn generate_slot_collection_mutators(ctx: &SlotFieldContext) -> TokenStream {
         unresolved_inner_type_str
     );
     let with_fn_doc = format_doc_with_details(
-        format!("Appends a single item, choice, or slot to `{}`.", field_name),
+        format!(
+            "Appends a single item, choice, or slot to `{}`.",
+            field_name
+        ),
         &ctx.doc_lines,
         Some(&with_footer),
     );
@@ -657,11 +660,7 @@ fn extract_doc_comments(attrs: &[syn::Attribute]) -> Vec<String> {
         .collect()
 }
 
-fn format_doc_with_details(
-    summary: String,
-    doc_lines: &[String],
-    footer: Option<&str>,
-) -> String {
+fn format_doc_with_details(summary: String, doc_lines: &[String], footer: Option<&str>) -> String {
     let mut parts = vec![summary];
     if !doc_lines.is_empty() {
         parts.push(doc_lines.join("\n"));
