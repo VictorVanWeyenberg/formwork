@@ -744,8 +744,11 @@ fn test_7_1_all_derives_on_all_six_slot_kinds_resolved_and_unresolved() {
         ))
         .with_collection_leaf("Torch")
         .pick_leaf(
-            MultiChoice::new("Skills", vec!["Athletics".to_string(), "Stealth".to_string()])
-                .with_cardinality(Cardinality::Exact(1)),
+            MultiChoice::new(
+                "Skills",
+                vec!["Athletics".to_string(), "Stealth".to_string()],
+            )
+            .with_cardinality(Cardinality::Exact(1)),
         )
         .single_cascade(child_a)
         .with_collection_cascade(child_b)
@@ -803,3 +806,138 @@ fn test_7_1_all_derives_on_all_six_slot_kinds_resolved_and_unresolved() {
     assert_eq!(compat_resolved.name, "Test");
 }
 
+// ============================================================================
+// 8. Adversarial Edge Cases (No Builder, Float Slots, Qualified Derives, Serde Attrs, 2-Segment Types)
+// ============================================================================
+
+/// Struct without `builder` enabled across collection and single slots.
+#[schematic]
+#[derive(
+    Clone,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub struct NoBuilderSchematic {
+    pub tag: String,
+    #[slot]
+    pub item: Option<String>,
+    #[slot(collection)]
+    pub list: Vec<String>,
+}
+
+/// Struct with `f64` slots (which implement `PartialEq` and `PartialOrd`, but NOT `Eq`, `Ord`, or `Hash`)
+/// and a 2-segment non-slot path (`serde_json::Value`) to verify `__qualify_mode` does not corrupt non-`M` paths.
+#[schematic(builder)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct FloatAndTwoSegmentTarget {
+    pub metadata: serde_json::Value,
+    #[serde(default)]
+    pub static_items: Vec<String>,
+    #[serde(rename = "weight_kg")]
+    #[slot]
+    pub weight: f64,
+    #[serde(default)]
+    #[slot(collection)]
+    pub measurements: Vec<f64>,
+    #[slot(pick)]
+    pub calibration_points: Vec<f64>,
+}
+
+/// Struct using fully-qualified `std::*` paths in `#[derive(...)]` and `#[derive(Default)]`.
+#[schematic(builder)]
+#[derive(
+    std::clone::Clone,
+    std::fmt::Debug,
+    std::default::Default,
+    std::cmp::PartialEq,
+    std::cmp::Eq,
+    std::cmp::PartialOrd,
+    std::cmp::Ord,
+    std::hash::Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub struct QualifiedStdDerivesTarget {
+    #[serde(default)]
+    pub count: usize,
+    #[serde(default)]
+    #[slot(collection)]
+    pub entries: Vec<String>,
+}
+
+#[test]
+fn test_8_1_no_builder_derives_and_default() {
+    let default_resolved: NoBuilderSchematic = NoBuilderSchematic::default();
+    assert_eq!(default_resolved.tag, "");
+    assert_eq!(default_resolved.item, None);
+    assert!(default_resolved.list.is_empty());
+
+    let bp = NoBuilderSchematicSchematic {
+        tag: "manual".to_string(),
+        item: Slot::FixedUnresolved(Some("value".to_string())),
+        list: vec![Slot::FixedUnresolved("entry".to_string())],
+    };
+    assert!(bp.is_complete());
+    let resolved = bp.clone().resolve().unwrap();
+    assert_eq!(resolved.tag, "manual");
+    assert_eq!(resolved.item, Some("value".to_string()));
+    assert_eq!(resolved.list, vec!["entry".to_string()]);
+}
+
+#[test]
+fn test_8_2_float_selective_derives_and_two_segment_non_slot_paths() {
+    let bp = FloatAndTwoSegmentTarget::builder()
+        .metadata(serde_json::json!({"unit": "metric"}))
+        .with_static_items("sensor-1")
+        .weight(42.5_f64)
+        .with_measurements(1.25_f64)
+        .calibration_points(vec![0.0_f64, 100.0_f64])
+        .build();
+
+    assert!(bp.is_complete());
+    let json = serde_json::to_string(&bp).unwrap();
+    assert!(json.contains("weight_kg"));
+
+    let roundtrip: FloatAndTwoSegmentTargetSchematic = serde_json::from_str(&json).unwrap();
+    assert_eq!(bp, roundtrip);
+
+    let resolved = bp.resolve().unwrap();
+    assert_eq!(resolved.weight, 42.5_f64);
+    assert_eq!(resolved.measurements, vec![1.25_f64]);
+    assert_eq!(resolved.calibration_points, vec![0.0_f64, 100.0_f64]);
+    assert_eq!(resolved.static_items, vec!["sensor-1".to_string()]);
+    assert_eq!(resolved.metadata, serde_json::json!({"unit": "metric"}));
+}
+
+#[test]
+fn test_8_3_qualified_std_derives_and_default_on_blueprint_and_resolved() {
+    use std::collections::{BTreeSet, HashSet};
+
+    let def_bp = QualifiedStdDerivesTargetSchematic::default();
+    assert!(def_bp.is_complete());
+    assert!(def_bp.entries.is_empty());
+
+    let def_resolved: QualifiedStdDerivesTarget = QualifiedStdDerivesTarget::default();
+    assert_eq!(def_resolved.count, 0);
+    assert!(def_resolved.entries.is_empty());
+
+    let built = QualifiedStdDerivesTarget::builder()
+        .count(3usize)
+        .with_entries("one")
+        .build();
+    assert!(built.is_complete());
+    let mut set = HashSet::new();
+    set.insert(built.clone());
+    assert!(set.contains(&built));
+
+    let mut btree = BTreeSet::new();
+    btree.insert(built.clone());
+    assert!(btree.contains(&built));
+}

@@ -207,4 +207,3 @@ pub fn __qualify_mode(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
     quote::quote!(#item_struct).into()
 }
-

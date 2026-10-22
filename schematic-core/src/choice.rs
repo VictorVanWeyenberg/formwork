@@ -122,7 +122,9 @@ impl Display for Cardinality {
 /// Stores staged selections and previous history generically via `H`:
 /// - [`SingleChoice`] instantiates `ChoiceState<usize>` (stack-only scalar, zero heap allocations).
 /// - [`MultiChoice`] instantiates `ChoiceState<Vec<usize>>` (dynamic collection of selected indices).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub enum ChoiceState<H> {
     /// Choice is open; no selections have been staged or made.
     #[default]
