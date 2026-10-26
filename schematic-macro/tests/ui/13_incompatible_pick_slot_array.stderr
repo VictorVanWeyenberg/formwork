@@ -1,0 +1,25 @@
+error[E0277]: the trait bound `[u32; 2]: IntoTargetNumsSlot<_>` is not satisfied
+  --> tests/ui/13_incompatible_pick_slot_array.rs:11:36
+   |
+11 |     let _ = Target::builder().nums([10u32, 20u32]).build();
+   |                               ---- ^^^^^^^^^^^^^^ the trait `IntoTargetNumsSlot<_>` is not implemented for `[u32; 2]`
+   |                               |
+   |                               required by a bound introduced by this call
+   |
+help: `[__V; __N]` implements trait `IntoTargetNumsSlot<M>`
+  --> tests/ui/13_incompatible_pick_slot_array.rs:3:1
+   |
+ 3 | #[schematic(builder)]
+   | ^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | `IntoTargetNumsSlot<TargetResolved>`
+   | `IntoTargetNumsSlot<TargetUnresolved>`
+note: required by a bound in `TargetBuilder::<M>::nums`
+  --> tests/ui/13_incompatible_pick_slot_array.rs:3:1
+   |
+ 3 | #[schematic(builder)]
+   | ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `TargetBuilder::<M>::nums`
+...
+ 6 |     pub nums: Vec<u16>,
+   |         ---- required by a bound in this associated function
+   = note: this error originates in the attribute macro `schematic` (in Nightly builds, run with -Z macro-backtrace for more info)
