@@ -32,8 +32,8 @@ pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStrea
 
                 mode_types.push(quote! { type #mode_type_name #bounds_tokens; });
 
-                let unresolved_inner_type = field.unresolved_inner_type(config.cascade);
-                let resolved_inner_type = field.resolved_inner_type(config.cascade);
+                let unresolved_inner_type = field.unresolved_inner_type(&config);
+                let resolved_inner_type = field.resolved_inner_type(&config);
 
                 if config.collection {
                     unresolved_fields.push(quote! { type #mode_type_name = Vec<schematic::SingleSlot<#unresolved_inner_type, #resolved_inner_type>>; });

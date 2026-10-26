@@ -51,8 +51,8 @@ impl<'a> SlotFieldContext<'a> {
         let mode_type_name = format_ident!("{}", camel_name);
         let trait_name = format_ident!("Into{}{}Slot", struct_idents.name, camel_name);
 
-        let unresolved_inner_type = field.unresolved_inner_type(config.cascade);
-        let resolved_inner_type = field.resolved_inner_type(config.cascade);
+        let unresolved_inner_type = field.unresolved_inner_type(config);
+        let resolved_inner_type = field.resolved_inner_type(config);
 
         let slot_type = if config.pick {
             quote! { schematic::MultiSlot<#unresolved_inner_type, #resolved_inner_type> }
@@ -85,7 +85,7 @@ impl<'a> SlotFieldContext<'a> {
             resolved_inner_type,
             slot_type,
             choice_type,
-            is_string: field.is_string_base_type(),
+            is_string: field.is_string_slot(config),
         }
     }
 }

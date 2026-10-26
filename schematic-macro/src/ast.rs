@@ -86,6 +86,37 @@ impl SchematicField {
                 )
                 .with_span(&self.ident));
             }
+            if config.collection && self.inner_type_if_vec().is_none() {
+                return Err(darling::Error::custom(
+                    "`#[slot(collection)]` requires a `Vec<T>` field type",
+                )
+                .with_span(&self.ty));
+            }
+            if config.pick && self.inner_type_if_vec().is_none() {
+                return Err(
+                    darling::Error::custom("`#[slot(pick)]` requires a `Vec<T>` field type")
+                        .with_span(&self.ty),
+                );
+            }
+            if config.cascade
+                && !config.collection
+                && !config.pick
+                && self.inner_type_if_vec().is_some()
+            {
+                return Err(darling::Error::custom(
+                    "`#[slot(cascade)]` cannot be used on `Vec<T>`; did you mean `#[slot(collection, cascade)]` or `#[slot(pick, cascade)]`?",
+                )
+                .with_span(&self.ty));
+            }
+            if config.cascade {
+                let item = self.slot_item_type(&config);
+                if unresolved_mode_type(item).is_none() || resolved_mode_type(item).is_none() {
+                    return Err(darling::Error::custom(
+                        "`#[slot(cascade)]` requires a type path that can support HKD mode types",
+                    )
+                    .with_span(item));
+                }
+            }
             Ok(Some(config))
         } else {
             Ok(None)
@@ -96,33 +127,37 @@ impl SchematicField {
         self.slot_config().unwrap_or(None).is_some()
     }
 
-    pub fn base_type(&self) -> &Type {
-        self.inner_type_if_vec().unwrap_or(&self.ty)
-    }
-
-    pub fn unresolved_inner_type(&self, cascade: bool) -> proc_macro2::TokenStream {
-        let base = self.base_type();
-        if cascade {
-            let mode = unresolved_mode_type(base).unwrap();
-            quote::quote! { #base<#mode> }
+    pub fn slot_item_type<'a>(&'a self, config: &SlotConfig) -> &'a Type {
+        if config.collection || config.pick {
+            self.inner_type_if_vec().unwrap_or(&self.ty)
         } else {
-            quote::quote! { #base }
+            &self.ty
         }
     }
 
-    pub fn resolved_inner_type(&self, cascade: bool) -> proc_macro2::TokenStream {
-        let base = self.base_type();
-        if cascade {
-            let mode = resolved_mode_type(base).unwrap();
-            quote::quote! { #base<#mode> }
+    pub fn unresolved_inner_type(&self, config: &SlotConfig) -> proc_macro2::TokenStream {
+        let item = self.slot_item_type(config);
+        if config.cascade {
+            let mode = unresolved_mode_type(item).unwrap();
+            quote::quote! { #item<#mode> }
         } else {
-            quote::quote! { #base }
+            quote::quote! { #item }
         }
     }
 
-    pub fn is_string_base_type(&self) -> bool {
+    pub fn resolved_inner_type(&self, config: &SlotConfig) -> proc_macro2::TokenStream {
+        let item = self.slot_item_type(config);
+        if config.cascade {
+            let mode = resolved_mode_type(item).unwrap();
+            quote::quote! { #item<#mode> }
+        } else {
+            quote::quote! { #item }
+        }
+    }
+
+    pub fn is_string_slot(&self, config: &SlotConfig) -> bool {
         matches!(
-            self.base_type(),
+            self.slot_item_type(config),
             Type::Path(p) if p.path.segments.last().is_some_and(|s| s.ident == "String")
         )
     }

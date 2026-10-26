@@ -49,6 +49,7 @@ pub mod skill;
 pub mod spell;
 pub mod traits;
 pub mod valueref;
+pub mod tiny;
 
 pub use inventory::{armor, item, tool, wallet, weapon};
 
