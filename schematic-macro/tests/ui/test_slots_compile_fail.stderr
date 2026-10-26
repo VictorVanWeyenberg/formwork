@@ -10,16 +10,16 @@ error[E0308]: mismatched types
   --> tests/ui/test_slots_compile_fail.rs:15:15
    |
 15 |         leaf: MultiSlot::Choose(MultiChoice::new("Pick leaf", vec!["A".to_string()])), // Expected SingleSlot
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Slot<String, String, _>`, found `Slot<Vec<String>, Vec<_>, _>`
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Slot<String, String, _>`, found `Slot<Vec<_>, Vec<_>, MultiChoice<_>>`
    |
    = note: expected enum `Slot<String, String, SingleChoice<String>>`
-              found enum `Slot<Vec<String>, Vec<_>, MultiChoice<String>>`
+              found enum `Slot<Vec<_>, Vec<_>, MultiChoice<_>>`
 
 error[E0308]: mismatched types
   --> tests/ui/test_slots_compile_fail.rs:16:23
    |
 16 |         dwarf_traits: SingleSlot::Choose(SingleChoice::new("Pick trait", vec!["A".to_string()])), // Expected MultiSlot
-   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Vec<Slot<String, String, _>>`, found `Slot<String, _, SingleChoice<String>>`
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Vec<Slot<String, String, _>>`, found `Slot<_, _, SingleChoice<_>>`
    |
    = note: expected struct `Vec<Slot<String, String, SingleChoice<String>>>`
-                found enum `Slot<String, _, SingleChoice<String>>`
+                found enum `Slot<_, _, SingleChoice<_>>`

@@ -283,35 +283,34 @@ fn test_deeply_nested_tensor_slot() {
 #[schematic(builder)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StringErgonomicsMatrixTarget {
-    /// Scalar String: MUST accept &str, String, SingleChoice<String>, SingleSlot
+    /// Scalar String: accepts Into<String> in resolved mode, String/Choice in unresolved mode
     #[slot]
     pub scalar_string: String,
 
-    /// Scalar Vec<String>: MUST accept Vec<String>, SingleChoice<Vec<String>>, SingleSlot
-    /// MUST NOT accept &str or &[&str]
+    /// Scalar Vec<String>: accepts Vec<String>, SingleChoice<Vec<String>>, SingleSlot
     #[slot]
     pub scalar_vec_string: Vec<String>,
 
-    /// Collection String: MUST accept &str, String, SingleChoice<String>, SingleSlot
+    /// Collection String: accepts Into<String> in resolved mode, String/Choice in unresolved mode
     #[slot(collection)]
     pub collection_string: Vec<String>,
 
-    /// Pick String: MUST accept Vec<&str>, &[&str], Vec<String>, MultiChoice, MultiSlot
+    /// Pick String: accepts Vec<__V>, [__V; __N], MultiChoice, MultiSlot
     #[slot(pick)]
     pub pick_string: Vec<String>,
 }
 
 #[test]
 fn test_string_ergonomics_unresolved_mode() {
-    let pick_slice: &[&str] = &["pick1", "pick2"];
+    let pick_slice = ["pick1", "pick2"];
 
     // Builder test using ergonomic conversions where permitted
     let bp = StringErgonomicsMatrixTargetSchematic::builder()
-        .scalar_string("scalar_text") // &str -> SingleSlot<String, String>
+        .scalar_string("scalar_text".to_string())
         .scalar_vec_string(vec!["v1".to_string(), "v2".to_string()]) // Vec<String>
-        .with_collection_string("elem1") // &str -> SingleSlot<String, String>
+        .with_collection_string("elem1".to_string())
         .with_collection_string(String::from("elem2")) // String -> SingleSlot<String, String>
-        .pick_string(pick_slice) // &[&str] -> MultiSlot<String, String>
+        .pick_string(pick_slice) // [__V; __N] -> MultiSlot<String, String>
         .build();
 
     assert!(bp.is_complete());
@@ -325,14 +324,14 @@ fn test_string_ergonomics_unresolved_mode() {
 
 #[test]
 fn test_string_ergonomics_resolved_mode() {
-    let pick_slice: &[&str] = &["p_res1", "p_res2"];
+    let pick_slice = ["p_res1", "p_res2"];
 
     let direct: StringErgonomicsMatrixTarget = StringErgonomicsMatrixTarget::builder()
-        .scalar_string("res_scalar") // &str -> String
+        .scalar_string("res_scalar") // &str -> String via Into<String>
         .scalar_vec_string(vec!["res_v1".to_string()]) // Vec<String> -> Vec<String>
-        .with_collection_string("res_coll1") // &str -> String
+        .with_collection_string("res_coll1") // &str -> String via Into<String>
         .with_collection_string(String::from("res_coll2")) // String -> String
-        .pick_string(pick_slice) // &[&str] -> Vec<String>
+        .pick_string(pick_slice) // [__V; __N] -> Vec<String>
         .build();
 
     assert_eq!(direct.scalar_string, "res_scalar");

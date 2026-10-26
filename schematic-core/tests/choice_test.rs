@@ -3,7 +3,7 @@ use schematic_core::error::SchematicError;
 
 #[test]
 fn test_single_choice_universal_calling_contract() {
-    let mut choice = SingleChoice::new("Pick weapon", vec!["Sword", "Bow"]);
+    let mut choice: SingleChoice<&str> = SingleChoice::new("Pick weapon", vec!["Sword", "Bow"]);
 
     // 1. Initial state is Pending
     assert_eq!(choice.state(), &ChoiceState::Pending);
@@ -41,7 +41,7 @@ fn test_single_choice_universal_calling_contract() {
 
 #[test]
 fn test_single_choice_zero_heap_allocation_size() {
-    let choice = SingleChoice::new("Class", vec!["Fighter", "Wizard"]);
+    let choice: SingleChoice<&str> = SingleChoice::new("Class", vec!["Fighter", "Wizard"]);
     // ChoiceState<usize> is 16 bytes on 64-bit systems (tag + padding + usize).
     // It is Copy and stack-only (zero heap allocation for state).
     assert!(std::mem::size_of_val(&choice.state) <= 16);
@@ -49,7 +49,7 @@ fn test_single_choice_zero_heap_allocation_size() {
 
 #[test]
 fn test_single_choice_deselect_and_unmake() {
-    let mut choice = SingleChoice::new("Color", vec!["Red", "Blue"]);
+    let mut choice: SingleChoice<&str> = SingleChoice::new("Color", vec!["Red", "Blue"]);
     choice.select(1).unwrap();
     choice.confirm().unwrap();
     assert!(choice.is_made());
@@ -71,7 +71,7 @@ fn test_single_choice_deselect_and_unmake() {
 
 #[test]
 fn test_multi_choice_universal_calling_contract() {
-    let mut choice = MultiChoice::new(
+    let mut choice: MultiChoice<&str> = MultiChoice::new(
         "Skills",
         vec!["Athletics", "Stealth", "Arcana", "Perception"],
     )
@@ -110,7 +110,7 @@ fn test_multi_choice_universal_calling_contract() {
 
 #[test]
 fn test_multi_choice_lossless_unmake_confirm_roundtrip() {
-    let mut choice = MultiChoice::new("Tools", vec!["Smith", "Brewer", "Mason"])
+    let mut choice: MultiChoice<&str> = MultiChoice::new("Tools", vec!["Smith", "Brewer", "Mason"])
         .with_cardinality(Cardinality::Exact(2));
 
     choice.select(0).unwrap();
@@ -132,7 +132,7 @@ fn test_multi_choice_lossless_unmake_confirm_roundtrip() {
 
 #[test]
 fn test_multi_choice_deselect_demotes_made_choice() {
-    let mut choice = MultiChoice::new("Languages", vec!["Common", "Dwarvish", "Elvish"])
+    let mut choice: MultiChoice<&str> = MultiChoice::new("Languages", vec!["Common", "Dwarvish", "Elvish"])
         .with_cardinality(Cardinality::Exact(2));
 
     choice.select(0).unwrap();
@@ -153,7 +153,7 @@ fn test_multi_choice_deselect_demotes_made_choice() {
 
 #[test]
 fn test_multi_choice_duplicate_selection_guard() {
-    let mut choice = MultiChoice::new("Spells", vec!["Shield", "Magic Missile"]);
+    let mut choice: MultiChoice<&str> = MultiChoice::new("Spells", vec!["Shield", "Magic Missile"]);
     choice.select(0).unwrap();
     let err = choice.select(0).unwrap_err();
     match err {

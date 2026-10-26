@@ -155,13 +155,6 @@ impl SchematicField {
         }
     }
 
-    pub fn is_string_slot(&self, config: &SlotConfig) -> bool {
-        matches!(
-            self.slot_item_type(config),
-            Type::Path(p) if p.path.segments.last().is_some_and(|s| s.ident == "String")
-        )
-    }
-
     pub fn inner_type_if_vec(&self) -> Option<&Type> {
         if let syn::Type::Path(syn::TypePath { path, .. }) = &self.ty
             && let Some(segment) = path.segments.last()

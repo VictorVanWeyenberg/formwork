@@ -29,10 +29,10 @@ pub struct SingleLeafTarget {
 
 #[test]
 fn test_1_1_single_leaf_raw_values() {
-    // Direct raw &str assignment
+    // Direct raw value assignment
     let bp_str = SingleLeafTarget::builder()
         .id(1u32)
-        .weapon("Warhammer")
+        .weapon("Warhammer".to_string())
         .build();
     assert!(bp_str.is_complete());
     let resolved_str = bp_str.resolve().unwrap();
@@ -160,8 +160,8 @@ fn test_2_1_collection_leaf_empty_default() {
 #[test]
 fn test_2_2_collection_leaf_mutators_append() {
     let bp = CollectionLeafTarget::builder()
-        .with_tags("alpha")
-        .with_tags("beta")
+        .with_tags("alpha".to_string())
+        .with_tags("beta".to_string())
         .tags(vec!["gamma".to_string()])
         .build();
 
@@ -174,7 +174,7 @@ fn test_2_2_collection_leaf_mutators_append() {
 fn test_2_3_collection_leaf_interleaved_items_and_singlechoice() {
     let choice = SingleChoice::new("Pick 1 tag", vec!["dyn1".to_string(), "dyn2".to_string()]);
     let mut bp = CollectionLeafTarget::builder()
-        .with_tags("static")
+        .with_tags("static".to_string())
         .with_tags(choice)
         .build();
 
@@ -201,10 +201,10 @@ fn test_2_4_collection_leaf_preserves_1_to_1_order() {
     let choice2 = SingleChoice::new("Pick tag 2", vec!["mid2".to_string(), "alt2".to_string()]);
 
     let mut bp = CollectionLeafTarget::builder()
-        .with_tags("first")
+        .with_tags("first".to_string())
         .with_tags(choice1)
         .with_tags(choice2)
-        .with_tags("last")
+        .with_tags("last".to_string())
         .build();
 
     bp.tags[1].as_choice_mut().unwrap().select(0).unwrap();
@@ -281,7 +281,7 @@ fn test_3_1_pick_leaf_exact_cardinality() {
 
 #[test]
 fn test_3_2_pick_leaf_duplicate_selection_guard() {
-    let mut choice = MultiChoice::new(
+    let mut choice: MultiChoice<String> = MultiChoice::new(
         "Pick 2 skills",
         vec![
             "History".to_string(),
@@ -411,7 +411,7 @@ fn test_4_2_single_cascade_automated_resolution_via_visitor() {
 fn test_4_3_single_cascade_choice_of_child_blueprints() {
     let cand_a = ChildSlotNode::builder()
         .id("CandidateA")
-        .value("FixedA")
+        .value("FixedA".to_string())
         .build();
 
     let cand_b = ChildSlotNode::builder()
@@ -510,7 +510,7 @@ pub struct GroupCollectionCascade {
 
 #[test]
 fn test_5_1_collection_cascade_mixed_ready_and_pending_children() {
-    let child1: ItemSubsystemSchematic = ItemSubsystem::builder().code("SYS1").mode("Auto").build();
+    let child1: ItemSubsystemSchematic = ItemSubsystem::builder().code("SYS1").mode("Auto".to_string()).build();
 
     let child2: ItemSubsystemSchematic = ItemSubsystem::builder()
         .code("SYS2")
@@ -590,7 +590,7 @@ pub struct AdventuringParty {
 fn test_6_1_pick_cascade_pool_of_candidates_with_internal_choices() {
     let cand1: SpecialistCompanionSchematic = SpecialistCompanion::builder()
         .name("Warrior")
-        .ability("Swordplay")
+        .ability("Swordplay".to_string())
         .build();
 
     let cand2: SpecialistCompanionSchematic = SpecialistCompanion::builder()
@@ -726,7 +726,7 @@ pub struct ExplicitDerivesBackwardsCompat {
 fn test_7_1_all_derives_on_all_six_slot_kinds_resolved_and_unresolved() {
     use std::collections::{BTreeSet, HashSet};
 
-    let child_a: DeriveChildSchematic = DeriveChild::builder().id("A").item("Sword").build();
+    let child_a: DeriveChildSchematic = DeriveChild::builder().id("A").item("Sword".to_string()).build();
     let child_b = DeriveChild::builder()
         .id("B")
         .item(SingleChoice::new(
@@ -734,7 +734,8 @@ fn test_7_1_all_derives_on_all_six_slot_kinds_resolved_and_unresolved() {
             vec!["Buckler".to_string(), "Kite".to_string()],
         ))
         .build();
-    let child_c = DeriveChild::builder().id("C").item("Helm").build();
+    let child_c: DeriveChildSchematic =
+        DeriveChild::builder().id("C").item("Helm".to_string()).build();
 
     let mut bp: AllSlotKindsDeriveTargetSchematic = AllSlotKindsDeriveTarget::builder()
         .label("Hero")
@@ -742,7 +743,7 @@ fn test_7_1_all_derives_on_all_six_slot_kinds_resolved_and_unresolved() {
             "Class",
             vec!["Paladin".to_string(), "Ranger".to_string()],
         ))
-        .with_collection_leaf("Torch")
+        .with_collection_leaf("Torch".to_string())
         .pick_leaf(
             MultiChoice::new(
                 "Skills",
@@ -798,9 +799,10 @@ fn test_7_1_all_derives_on_all_six_slot_kinds_resolved_and_unresolved() {
     assert_eq!(resolved, resolved_roundtrip);
 
     // Verify backwards compatibility with explicit #[schematic(derives(...))]
-    let compat_bp = ExplicitDerivesBackwardsCompat::builder()
-        .name("Test")
-        .build();
+    let compat_bp: ExplicitDerivesBackwardsCompatSchematic =
+        ExplicitDerivesBackwardsCompat::builder()
+            .name("Test".to_string())
+            .build();
     let compat_resolved = compat_bp.clone().resolve().unwrap();
     assert_eq!(compat_bp, compat_bp.clone());
     assert_eq!(compat_resolved.name, "Test");
@@ -928,9 +930,9 @@ fn test_8_3_qualified_std_derives_and_default_on_blueprint_and_resolved() {
     assert_eq!(def_resolved.count, 0);
     assert!(def_resolved.entries.is_empty());
 
-    let built = QualifiedStdDerivesTarget::builder()
+    let built: QualifiedStdDerivesTargetSchematic = QualifiedStdDerivesTarget::builder()
         .count(3usize)
-        .with_entries("one")
+        .with_entries("one".to_string())
         .build();
     assert!(built.is_complete());
     let mut set = HashSet::new();
@@ -970,16 +972,16 @@ pub struct DocumentedAndResolvedBuilderTarget {
 
 #[test]
 fn test_8_4_documented_fields_and_resolved_mode_builder_ergonomics() {
-    let perk_slice: &[&str] = &["PerkA", "PerkB"];
+    let perk_slice = ["PerkA", "PerkB"];
 
-    // Build directly in Unresolved mode using &[&str] on pick slot and iterator mutator on collection slot
+    // Build directly in Unresolved mode using [__V; __N] on pick slot and iterator mutator on collection slot
     let bp: DocumentedAndResolvedBuilderTargetSchematic =
         DocumentedAndResolvedBuilderTarget::builder()
             .id("cfg-1")
             .with_static_labels("v1")
-            .role("Tank")
-            .with_equipment("Shield")
-            .equipment(["Armor", "Boots"])
+            .role("Tank".to_string())
+            .with_equipment("Shield".to_string())
+            .equipment(["Armor".to_string(), "Boots".to_string()])
             .perks(perk_slice)
             .build();
     assert!(bp.is_complete());
@@ -998,7 +1000,7 @@ fn test_8_4_documented_fields_and_resolved_mode_builder_ergonomics() {
 
     assert_eq!(resolved_from_bp, direct_resolved);
 
-    // Also test &[&str] in Resolved mode
+    // Also test [__V; __N] in Resolved mode
     let direct_resolved_slice: DocumentedAndResolvedBuilderTarget =
         DocumentedAndResolvedBuilderTarget::builder()
             .id("cfg-1")

@@ -104,7 +104,7 @@ fn test_adversarial_entity_builder_and_resolution() {
         .with_collection_cascade(
             ChildEntitySchematic::builder()
                 .id("child-2")
-                .details("ResolvedDetail")
+                .details("ResolvedDetail".to_string())
                 .build(),
         )
         .build();

@@ -37,7 +37,6 @@ struct SlotFieldContext<'a> {
     resolved_inner_type: TokenStream,
     slot_type: TokenStream,
     choice_type: TokenStream,
-    is_string: bool,
 }
 
 impl<'a> SlotFieldContext<'a> {
@@ -85,7 +84,6 @@ impl<'a> SlotFieldContext<'a> {
             resolved_inner_type,
             slot_type,
             choice_type,
-            is_string: field.is_string_slot(config),
         }
     }
 }
@@ -253,70 +251,81 @@ fn generate_pick_slot_trait_impls(ctx: &SlotFieldContext) -> Vec<TokenStream> {
                 }
             }
         },
-        // 3. Vec<#unresolved_inner_type>
-        quote! {
+    ];
+
+    if ctx.config.cascade {
+        trait_impls.push(quote! {
             #[doc(hidden)]
             impl #trait_name<#unresolved_struct> for Vec<#unresolved_inner_type> {
                 fn into_slot(self) -> #slot_type {
                     schematic::Slot::FixedUnresolved(self)
                 }
             }
-        },
-    ];
-
-    // 4. Resolved Vec (if cascade)
-    if ctx.config.cascade {
-        trait_impls.push(quote! {
+            #[doc(hidden)]
+            impl<const __N: usize> #trait_name<#unresolved_struct> for [#unresolved_inner_type; __N] {
+                fn into_slot(self) -> #slot_type {
+                    schematic::Slot::FixedUnresolved(self.into_iter().collect())
+                }
+            }
             #[doc(hidden)]
             impl #trait_name<#unresolved_struct> for Vec<#resolved_inner_type> {
                 fn into_slot(self) -> #slot_type {
                     schematic::Slot::FixedResolved(self)
                 }
             }
+            #[doc(hidden)]
+            impl<const __N: usize> #trait_name<#unresolved_struct> for [#resolved_inner_type; __N] {
+                fn into_slot(self) -> #slot_type {
+                    schematic::Slot::FixedResolved(self.into_iter().collect())
+                }
+            }
         });
-    }
-
-    // 5. String slices (unresolved mode)
-    if ctx.is_string {
+    } else {
         trait_impls.push(quote! {
             #[doc(hidden)]
-            impl #trait_name<#unresolved_struct> for Vec<&str> {
+            impl<__V: std::convert::Into<#unresolved_inner_type>> #trait_name<#unresolved_struct> for Vec<__V> {
                 fn into_slot(self) -> #slot_type {
-                    schematic::Slot::FixedUnresolved(self.into_iter().map(|s| s.to_string()).collect())
+                    schematic::Slot::FixedUnresolved(self.into_iter().map(std::convert::Into::into).collect())
                 }
             }
             #[doc(hidden)]
-            impl #trait_name<#unresolved_struct> for &[&str] {
+            impl<__V: std::convert::Into<#unresolved_inner_type>, const __N: usize> #trait_name<#unresolved_struct> for [__V; __N] {
                 fn into_slot(self) -> #slot_type {
-                    schematic::Slot::FixedUnresolved(self.iter().map(|s| s.to_string()).collect())
+                    schematic::Slot::FixedUnresolved(self.into_iter().map(std::convert::Into::into).collect())
                 }
             }
         });
     }
 
-    // 6. Resolved Struct Impl
+    // Resolved Struct Impl
     let return_ty_resolved = quote! { Vec<#resolved_inner_type> };
-    trait_impls.push(quote! {
-        #[doc(hidden)]
-        impl #trait_name<#resolved_struct> for Vec<#resolved_inner_type> {
-            fn into_slot(self) -> #return_ty_resolved {
-                self
-            }
-        }
-    });
-
-    if ctx.is_string {
+    if ctx.config.cascade {
         trait_impls.push(quote! {
             #[doc(hidden)]
-            impl #trait_name<#resolved_struct> for Vec<&str> {
+            impl #trait_name<#resolved_struct> for Vec<#resolved_inner_type> {
                 fn into_slot(self) -> #return_ty_resolved {
-                    self.into_iter().map(|s| s.to_string()).collect()
+                    self
                 }
             }
             #[doc(hidden)]
-            impl #trait_name<#resolved_struct> for &[&str] {
+            impl<const __N: usize> #trait_name<#resolved_struct> for [#resolved_inner_type; __N] {
                 fn into_slot(self) -> #return_ty_resolved {
-                    self.iter().map(|s| s.to_string()).collect()
+                    self.into_iter().collect()
+                }
+            }
+        });
+    } else {
+        trait_impls.push(quote! {
+            #[doc(hidden)]
+            impl<__V: std::convert::Into<#resolved_inner_type>> #trait_name<#resolved_struct> for Vec<__V> {
+                fn into_slot(self) -> #return_ty_resolved {
+                    self.into_iter().map(std::convert::Into::into).collect()
+                }
+            }
+            #[doc(hidden)]
+            impl<__V: std::convert::Into<#resolved_inner_type>, const __N: usize> #trait_name<#resolved_struct> for [__V; __N] {
+                fn into_slot(self) -> #return_ty_resolved {
+                    self.into_iter().map(std::convert::Into::into).collect()
                 }
             }
         });
@@ -385,39 +394,16 @@ fn generate_standard_slot_trait_impls(ctx: &SlotFieldContext) -> Vec<TokenStream
         }
     });
 
-    // 5. String / &str ergonomics (unresolved mode)
-    if ctx.is_string {
-        trait_impls.push(quote! {
-            #[doc(hidden)]
-            impl #trait_name<#unresolved_struct> for &str {
-                fn into_slot(self) -> #return_ty_unresolved {
-                    schematic::Slot::FixedUnresolved(self.to_string())
-                }
-            }
-        });
-    }
-
-    // 6. Resolved Struct Impl
+    // 5. Resolved Struct Impl
     let return_ty_resolved = quote! { #resolved_inner_type };
     trait_impls.push(quote! {
         #[doc(hidden)]
-        impl #trait_name<#resolved_struct> for #resolved_inner_type {
+        impl<__V: std::convert::Into<#resolved_inner_type>> #trait_name<#resolved_struct> for __V {
             fn into_slot(self) -> #return_ty_resolved {
-                self
+                self.into()
             }
         }
     });
-
-    if ctx.is_string {
-        trait_impls.push(quote! {
-            #[doc(hidden)]
-            impl #trait_name<#resolved_struct> for &str {
-                fn into_slot(self) -> #return_ty_resolved {
-                    self.to_string()
-                }
-            }
-        });
-    }
 
     trait_impls
 }

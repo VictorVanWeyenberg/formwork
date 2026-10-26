@@ -121,7 +121,7 @@ fn test_adversarial_single_choice_transitions() {
 
 #[test]
 fn test_adversarial_single_choice_empty_options() {
-    let mut choice = SingleChoice::new("Empty", Vec::<String>::new());
+    let mut choice: SingleChoice<String> = SingleChoice::new("Empty", Vec::<String>::new());
     assert!(choice.options().is_empty());
     assert!(choice.state().is_pending());
 
@@ -154,7 +154,7 @@ fn test_adversarial_single_choice_empty_options() {
 #[test]
 fn test_adversarial_multi_choice_cardinality_boundaries() {
     // 1. Cardinality::Exact(0)
-    let mut choice_zero =
+    let mut choice_zero: MultiChoice<&str> =
         MultiChoice::new("None", vec!["A", "B"]).with_cardinality(Cardinality::Exact(0));
     assert!(!choice_zero.is_made());
     // Confirm on Pending with Exact(0) should succeed!
@@ -163,14 +163,14 @@ fn test_adversarial_multi_choice_cardinality_boundaries() {
     assert_eq!(choice_zero.resolve().unwrap(), Vec::<&str>::new());
 
     // 2. Cardinality::UpTo(0)
-    let mut choice_upto_zero =
+    let mut choice_upto_zero: MultiChoice<&str> =
         MultiChoice::new("None", vec!["A", "B"]).with_cardinality(Cardinality::UpTo(0));
     choice_upto_zero.confirm().unwrap();
     assert!(choice_upto_zero.is_made());
     assert_eq!(choice_upto_zero.resolve().unwrap(), Vec::<&str>::new());
 
     // 3. Cardinality::UpTo(2) allows 0, 1, or 2 items
-    let mut choice_upto = MultiChoice::new("Skills", vec!["Athletics", "Stealth", "Arcana"])
+    let mut choice_upto: MultiChoice<&str> = MultiChoice::new("Skills", vec!["Athletics", "Stealth", "Arcana"])
         .with_cardinality(Cardinality::UpTo(2));
 
     // Confirm with 0 items works for UpTo(2)
@@ -228,7 +228,7 @@ fn test_adversarial_multi_choice_cardinality_boundaries() {
     assert_eq!(choice_upto.state(), &ChoiceState::Pending);
 
     // 4. Cardinality::AtLeast(2)
-    let mut choice_atleast = MultiChoice::new("Languages", vec!["Common", "Elvish", "Dwarvish"])
+    let mut choice_atleast: MultiChoice<&str> = MultiChoice::new("Languages", vec!["Common", "Elvish", "Dwarvish"])
         .with_cardinality(Cardinality::AtLeast(2));
     assert!(choice_atleast.confirm().is_err());
     choice_atleast.select(0).unwrap();
@@ -241,7 +241,7 @@ fn test_adversarial_multi_choice_cardinality_boundaries() {
 
 #[test]
 fn test_adversarial_multi_choice_error_resilience() {
-    let mut choice = MultiChoice::new("Tools", vec!["Smith", "Brewer", "Mason"])
+    let mut choice: MultiChoice<&str> = MultiChoice::new("Tools", vec!["Smith", "Brewer", "Mason"])
         .with_cardinality(Cardinality::Exact(2));
 
     // Out of bounds error
@@ -291,7 +291,7 @@ fn test_adversarial_multi_choice_error_resilience() {
 #[test]
 fn test_adversarial_multi_choice_resolution_order() {
     // Options declared in order [0, 1, 2]
-    let mut choice = MultiChoice::new("Letters", vec!["Alpha", "Beta", "Gamma"])
+    let mut choice: MultiChoice<&str> = MultiChoice::new("Letters", vec!["Alpha", "Beta", "Gamma"])
         .with_cardinality(Cardinality::Exact(3));
 
     // Stage selections out of declaration order: 2, 0, 1
@@ -308,7 +308,7 @@ fn test_adversarial_multi_choice_resolution_order() {
 #[test]
 fn test_adversarial_mutation_via_selected_values_mut() {
     // SingleChoice mutation
-    let mut single = SingleChoice::new("Color", vec!["red".to_string(), "blue".to_string()]);
+    let mut single: SingleChoice<String> = SingleChoice::new("Color", vec!["red".to_string(), "blue".to_string()]);
     single.select(1).unwrap();
     for val in single.selected_values_mut() {
         val.make_ascii_uppercase();
@@ -341,7 +341,7 @@ fn test_adversarial_mutation_via_selected_values_mut() {
 #[test]
 fn test_adversarial_visitor_edge_cases() {
     // 1. AutoSelectFirst on MultiChoice with Exact(3) but only 2 options available
-    let mut impossible_multi =
+    let mut impossible_multi: MultiChoice<&str> =
         MultiChoice::new("Traits", vec!["A", "B"]).with_cardinality(Cardinality::Exact(3));
     let mut visitor = AutoSelectFirst;
     assert_eq!(
@@ -353,7 +353,7 @@ fn test_adversarial_visitor_edge_cases() {
     assert_eq!(impossible_multi.selected_indices(), &[0, 1]);
 
     // 2. AutoSelectFirst on empty SingleChoice
-    let mut empty_single = SingleChoice::new("None", Vec::<String>::new());
+    let mut empty_single: SingleChoice<String> = SingleChoice::new("None", Vec::<String>::new());
     assert_eq!(
         visitor.visit_single(&mut empty_single),
         VisitorFlow::Continue
@@ -361,7 +361,7 @@ fn test_adversarial_visitor_edge_cases() {
     assert!(!empty_single.is_made());
 
     // 3. AutoSelectFirst does NOT overwrite an already made choice
-    let mut made_single = SingleChoice::new("Class", vec!["Fighter", "Wizard"]);
+    let mut made_single: SingleChoice<&str> = SingleChoice::new("Class", vec!["Fighter", "Wizard"]);
     made_single.select(1).unwrap();
     made_single.confirm().unwrap();
     assert_eq!(
@@ -371,7 +371,7 @@ fn test_adversarial_visitor_edge_cases() {
     assert_eq!(made_single.selected_index(), Some(1));
 
     // 4. UnmakeAll on already Pending choices does not fail
-    let mut pending_single = SingleChoice::new("Skill", vec!["Stealth"]);
+    let mut pending_single: SingleChoice<&str> = SingleChoice::new("Skill", vec!["Stealth"]);
     let mut unmake_visitor = UnmakeAll;
     assert_eq!(
         unmake_visitor.visit_single(&mut pending_single),

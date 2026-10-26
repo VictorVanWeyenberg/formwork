@@ -19,7 +19,7 @@
 //! ```rust
 //! use schematic_core::choice::{SingleChoice, ChoiceState};
 //!
-//! let mut choice = SingleChoice::new("Select Class", vec!["Fighter", "Wizard", "Rogue"]);
+//! let mut choice: SingleChoice<&str> = SingleChoice::new("Select Class", vec!["Fighter", "Wizard", "Rogue"]);
 //!
 //! // 1. Selection stages the candidate (does NOT make the choice)
 //! choice.select(0).unwrap();
@@ -189,14 +189,18 @@ impl<T> SingleChoice<T> {
     /// ```rust
     /// use schematic_core::choice::SingleChoice;
     ///
-    /// let choice = SingleChoice::new("Pick weapon", vec!["Sword", "Bow"]);
+    /// let choice: SingleChoice<&str> = SingleChoice::new("Pick weapon", vec!["Sword", "Bow"]);
     /// assert_eq!(choice.prompt(), "Pick weapon");
     /// assert_eq!(choice.options(), &["Sword", "Bow"]);
     /// ```
-    pub fn new(prompt: impl Into<String>, options: impl IntoIterator<Item = T>) -> Self {
+    pub fn new<I>(prompt: impl Into<String>, options: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<T>,
+    {
         Self {
             prompt: prompt.into(),
-            options: options.into_iter().collect(),
+            options: options.into_iter().map(Into::into).collect(),
             state: ChoiceState::Pending,
         }
     }
@@ -285,7 +289,7 @@ impl<T> SingleChoice<T> {
     /// ```rust
     /// use schematic_core::choice::SingleChoice;
     ///
-    /// let mut choice = SingleChoice::new("Color", vec!["Red", "Blue"]);
+    /// let mut choice: SingleChoice<&str> = SingleChoice::new("Color", vec!["Red", "Blue"]);
     /// choice.select(1).unwrap();
     /// assert_eq!(choice.selected_index(), Some(1));
     /// assert!(!choice.is_made()); // Staged, not Made!
@@ -313,7 +317,7 @@ impl<T> SingleChoice<T> {
     /// ```rust
     /// use schematic_core::choice::SingleChoice;
     ///
-    /// let mut choice = SingleChoice::new("Color", vec!["Red", "Blue"]);
+    /// let mut choice: SingleChoice<&str> = SingleChoice::new("Color", vec!["Red", "Blue"]);
     /// choice.select(0).unwrap();
     /// choice.confirm().unwrap();
     /// assert!(choice.is_made());
@@ -440,10 +444,14 @@ impl<T> MultiChoice<T> {
     /// # Arguments
     /// * `prompt` - A descriptive label or question for this choice.
     /// * `options` - An iterable sequence of candidate options.
-    pub fn new(prompt: impl Into<String>, options: impl IntoIterator<Item = T>) -> Self {
+    pub fn new<I>(prompt: impl Into<String>, options: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<T>,
+    {
         Self {
             prompt: prompt.into(),
-            options: options.into_iter().collect(),
+            options: options.into_iter().map(Into::into).collect(),
             cardinality: Cardinality::ONE,
             state: ChoiceState::Pending,
         }

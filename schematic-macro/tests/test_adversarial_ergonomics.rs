@@ -12,6 +12,6 @@ pub struct Child {
 fn test_adversarial_builder() {
     let _c: ChildSchematic = Child::builder()
         .non_slot_name("hello")
-        .name("unresolved")
+        .name("unresolved".to_string())
         .build();
 }

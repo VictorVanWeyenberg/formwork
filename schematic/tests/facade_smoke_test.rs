@@ -41,7 +41,7 @@ fn test_facade_end_to_end_smoke() {
 
 #[test]
 fn test_facade_manual_select_confirm_contract() {
-    let mut choice = SingleChoice::new("Skill", vec!["Athletics", "Acrobatics"]);
+    let mut choice: SingleChoice<&str> = SingleChoice::new("Skill", vec!["Athletics", "Acrobatics"]);
     assert!(!choice.is_made());
 
     choice.select(1).unwrap();

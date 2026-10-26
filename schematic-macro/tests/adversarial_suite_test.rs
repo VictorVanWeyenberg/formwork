@@ -89,9 +89,9 @@ pub struct PickErgonomicsHost {
 
 #[test]
 fn test_pick_direct_setter_variations() {
-    // 1. String slice &[&str]
+    // 1. Array [__V; __N]
     let bp_slice = PickErgonomicsHost::builder()
-        .str_items(&["alpha", "beta"][..])
+        .str_items(["alpha", "beta"])
         .num_items(vec![10u64, 20u64])
         .build();
     assert!(bp_slice.is_complete());
@@ -152,7 +152,7 @@ fn test_pick_cardinality_zero_or_empty() {
 
     let mut bp = PickErgonomicsHost::builder()
         .str_items(choice_empty)
-        .num_items(vec![])
+        .num_items(Vec::<u64>::new())
         .build();
 
     assert!(!bp.is_complete());
@@ -181,12 +181,12 @@ fn test_collection_slot_interleaving_and_chaining() {
     let ch2 = SingleChoice::new("C2", vec!["c2_val".to_string()]);
 
     let mut bp = CollInterleavingHost::builder()
-        .with_items("start")
+        .with_items("start".to_string())
         .items(vec!["bulk1".to_string(), "bulk2".to_string()])
         .with_items(ch1)
         .with_items(Slot::FixedUnresolved("mid".to_string()))
         .items(vec![ch2])
-        .with_items("end")
+        .with_items("end".to_string())
         .build();
 
     assert!(!bp.is_complete());
@@ -218,15 +218,16 @@ fn test_cascading_pick_unselected_incomplete_does_not_block_but_selected_does() 
         .id(1u32)
         .leaf_val(SingleChoice::new("L1", vec!["val1".to_string()]))
         .build();
-    let cand2 = AdversarialLeaf::builder().id(2u32).leaf_val("val2").build();
+    let cand2: AdversarialLeafSchematic =
+        AdversarialLeaf::builder().id(2u32).leaf_val("val2".to_string()).build();
 
     let pick_choice =
         MultiChoice::new("Pick 1", vec![cand1, cand2]).with_cardinality(Cardinality::Exact(1));
 
     let coll_child: AdversarialLeafSchematic =
-        AdversarialLeaf::builder().id(0u32).leaf_val("ok").build();
-    let mut host = AdversarialBranchBfs::builder()
-        .branch_name("B1")
+        AdversarialLeaf::builder().id(0u32).leaf_val("ok".to_string()).build();
+    let mut host: AdversarialBranchBfsSchematic = AdversarialBranchBfs::builder()
+        .branch_name("B1".to_string())
         .with_coll_children(coll_child)
         .pick_children(pick_choice)
         .build();
@@ -288,8 +289,8 @@ fn test_cascading_collection_incomplete_detection_in_choice_and_fixed() {
         .build();
 
     // Case A: incomplete child directly added as FixedUnresolved
-    let host_fixed = AdversarialBranchBfs::builder()
-        .branch_name("FixedIncomplete")
+    let host_fixed: AdversarialBranchBfsSchematic = AdversarialBranchBfs::builder()
+        .branch_name("FixedIncomplete".to_string())
         .with_coll_children(incomplete_leaf.clone())
         .pick_children(Vec::<AdversarialLeafSchematic>::new())
         .build();
@@ -302,8 +303,8 @@ fn test_cascading_collection_incomplete_detection_in_choice_and_fixed() {
 
     // Case B: incomplete child inside a SingleChoice that is confirmed
     let child_choice = SingleChoice::new("Choose Child", vec![incomplete_leaf]);
-    let mut host_choice = AdversarialBranchBfs::builder()
-        .branch_name("ChoiceIncomplete")
+    let mut host_choice: AdversarialBranchBfsSchematic = AdversarialBranchBfs::builder()
+        .branch_name("ChoiceIncomplete".to_string())
         .with_coll_children(child_choice)
         .pick_children(Vec::<AdversarialLeafSchematic>::new())
         .build();

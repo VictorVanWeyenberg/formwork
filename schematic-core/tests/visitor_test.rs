@@ -3,8 +3,8 @@ use schematic_core::visitor::{AutoSelectFirst, ChoiceVisitor, ConfirmAll, Unmake
 
 #[test]
 fn test_auto_select_first_stages_and_confirms() {
-    let mut single = SingleChoice::new("Hero", vec!["Paladin", "Ranger"]);
-    let mut multi = MultiChoice::new("Feats", vec!["Alert", "Tough", "Lucky"])
+    let mut single: SingleChoice<&str> = SingleChoice::new("Hero", vec!["Paladin", "Ranger"]);
+    let mut multi: MultiChoice<&str> = MultiChoice::new("Feats", vec!["Alert", "Tough", "Lucky"])
         .with_cardinality(Cardinality::Exact(2));
 
     assert!(!single.is_made());
@@ -25,7 +25,7 @@ fn test_auto_select_first_stages_and_confirms() {
 
 #[test]
 fn test_unmake_all_and_confirm_all_cycle() {
-    let mut single = SingleChoice::new("Hero", vec!["Paladin", "Ranger"]);
+    let mut single: SingleChoice<&str> = SingleChoice::new("Hero", vec!["Paladin", "Ranger"]);
     single.select(1).unwrap();
     single.confirm().unwrap();
     assert!(single.is_made());
