@@ -2,4 +2,4 @@ error: `#[slot(cascade)]` cannot be used on `Vec<T>`; did you mean `#[slot(colle
   --> tests/ui/07_cascade_on_vec.rs:13:19
    |
 13 |     pub children: Vec<Child>,
-   |                   ^^^
+   |                   ^^^^^^^^^^

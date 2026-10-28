@@ -184,7 +184,7 @@ fn test_collection_slot_interleaving_and_chaining() {
         .with_items("start".to_string())
         .items(vec!["bulk1".to_string(), "bulk2".to_string()])
         .with_items(ch1)
-        .with_items(Slot::FixedUnresolved("mid".to_string()))
+        .with_items("mid".to_string())
         .items(vec![ch2])
         .with_items("end".to_string())
         .build();

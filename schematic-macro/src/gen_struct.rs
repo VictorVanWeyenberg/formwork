@@ -395,11 +395,10 @@ fn generate_standard_slot_trait_impls(ctx: &SlotFieldContext) -> Vec<TokenStream
     });
 
     // 5. Resolved Struct Impl
-    let return_ty_resolved = quote! { #resolved_inner_type };
     trait_impls.push(quote! {
         #[doc(hidden)]
         impl<__V: std::convert::Into<#resolved_inner_type>> #trait_name<#resolved_struct> for __V {
-            fn into_slot(self) -> #return_ty_resolved {
+            fn into_slot(self) -> #resolved_inner_type {
                 self.into()
             }
         }
