@@ -5,7 +5,6 @@ use syn::{DeriveInput, parse_macro_input};
 mod ast;
 mod gen_mode;
 mod gen_schematic;
-#[path = "gen_struct/mod.rs"]
 mod gen_struct;
 mod gen_visitor;
 

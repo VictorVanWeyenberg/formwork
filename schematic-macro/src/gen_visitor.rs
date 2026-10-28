@@ -3,76 +3,61 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::Ident;
 
+#[derive(Default)]
+struct VisitorParts {
+    visitor_bounds: Vec<TokenStream>,
+    local_logic: Vec<TokenStream>,
+    cascade_logic: Vec<TokenStream>,
+    has_cascade: bool,
+}
+
 pub fn generate_visitor(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStream {
     let name = &ast.ident;
     let unresolved_struct = format_ident!("{}Unresolved", name);
-
-    let mut visitor_bounds = Vec::new();
-    let mut local_logic = Vec::new();
-    let mut cascade_logic = Vec::new();
-    let mut has_cascade = false;
-
     let is_dfs = args.traverse == TraversalStrategy::Dfs;
+    let parts = collect_visitor_parts(ast, is_dfs);
 
-    if let darling::ast::Data::Struct(fields) = &ast.data {
-        for field in &fields.fields {
-            process_field(
-                field,
-                is_dfs,
-                &mut visitor_bounds,
-                &mut local_logic,
-                &mut cascade_logic,
-                &mut has_cascade,
-            );
-        }
-    }
-
-    if visitor_bounds.is_empty() {
+    if parts.visitor_bounds.is_empty() {
         return generate_empty_walkable(name, &unresolved_struct);
     }
 
-    generate_walkable_impl(
-        name,
-        &unresolved_struct,
-        &visitor_bounds,
-        &local_logic,
-        &cascade_logic,
-        has_cascade,
-        is_dfs,
-    )
+    generate_walkable_impl(name, &unresolved_struct, &parts, is_dfs)
 }
 
-fn process_field(
-    field: &SchematicField,
-    is_dfs: bool,
-    visitor_bounds: &mut Vec<TokenStream>,
-    local_logic: &mut Vec<TokenStream>,
-    cascade_logic: &mut Vec<TokenStream>,
-    has_cascade: &mut bool,
-) {
+fn collect_visitor_parts(ast: &SchematicStruct, is_dfs: bool) -> VisitorParts {
+    let mut parts = VisitorParts::default();
+    if let darling::ast::Data::Struct(fields) = &ast.data {
+        for field in &fields.fields {
+            process_field(field, is_dfs, &mut parts);
+        }
+    }
+    parts
+}
+
+fn process_field(field: &SchematicField, is_dfs: bool, parts: &mut VisitorParts) {
     let Some(config) = field.slot_config().unwrap() else {
         return;
     };
     let field_name = field.ident.as_ref().unwrap();
     let unresolved_inner_type = field.unresolved_inner_type(&config);
 
-    visitor_bounds.push(quote! {
+    parts.visitor_bounds.push(quote! {
         V: schematic::ChoiceVisitor<#unresolved_inner_type>
     });
 
-    local_logic.push(generate_local_visit(field_name, &config));
+    parts.local_logic.push(generate_local_visit(field_name, &config));
 
     if config.cascade {
-        visitor_bounds.push(quote! {
+        parts.visitor_bounds.push(quote! {
             #unresolved_inner_type: schematic::Walkable<V>
         });
-        *has_cascade = true;
+        parts.has_cascade = true;
 
         let cascade = generate_cascade(field_name, &config, is_dfs);
         if is_dfs {
-            local_logic.push(cascade);
+            parts.local_logic.push(cascade);
         } else {
-            cascade_logic.push(cascade);
+            parts.cascade_logic.push(cascade);
         }
     }
 }
@@ -190,16 +175,12 @@ fn generate_empty_walkable(name: &Ident, unresolved_struct: &Ident) -> TokenStre
     }
 }
 
-fn generate_walkable_impl(
-    name: &Ident,
-    unresolved_struct: &Ident,
-    visitor_bounds: &[TokenStream],
-    local_logic: &[TokenStream],
-    cascade_logic: &[TokenStream],
-    has_cascade: bool,
+fn strategy_walk_branches(
     is_dfs: bool,
-) -> TokenStream {
-    let (depth_zero_continuation, depth_n_body) = if is_dfs {
+    has_cascade: bool,
+    cascade_logic: &[TokenStream],
+) -> (TokenStream, TokenStream) {
+    if is_dfs {
         (
             quote! { false },
             quote! { schematic::Level::continue_level(false) },
@@ -213,7 +194,19 @@ fn generate_walkable_impl(
                 level
             },
         )
-    };
+    }
+}
+
+fn generate_walkable_impl(
+    name: &Ident,
+    unresolved_struct: &Ident,
+    parts: &VisitorParts,
+    is_dfs: bool,
+) -> TokenStream {
+    let visitor_bounds = &parts.visitor_bounds;
+    let local_logic = &parts.local_logic;
+    let (depth_zero_continuation, depth_n_body) =
+        strategy_walk_branches(is_dfs, parts.has_cascade, &parts.cascade_logic);
 
     quote! {
         impl<V> schematic::Walkable<V> for #name<#unresolved_struct>
