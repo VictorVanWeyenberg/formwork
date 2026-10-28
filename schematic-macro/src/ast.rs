@@ -127,6 +127,13 @@ impl SchematicField {
         self.slot_config().unwrap_or(None).is_some()
     }
 
+    pub fn non_slot_attrs(&self) -> Vec<&Attribute> {
+        self.attrs
+            .iter()
+            .filter(|attr| !attr.path().is_ident("slot"))
+            .collect()
+    }
+
     pub fn slot_item_type<'a>(&'a self, config: &SlotConfig) -> &'a Type {
         if config.collection || config.pick {
             self.inner_type_if_vec().unwrap_or(&self.ty)

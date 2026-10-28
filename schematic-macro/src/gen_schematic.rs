@@ -33,12 +33,12 @@ pub fn generate_schematic(ast: &SchematicStruct) -> TokenStream {
                     (false, true, true) => {
                         complete_checks.push(generate_cascade_pick_complete_check(field_name));
                         resolve_fields.push(generate_cascade_pick_resolve_expression(field_name));
-                        from_fields.push(generate_general_pick_conversion(field_name));
+                        from_fields.push(generate_general_slot_conversion(field_name));
                     }
                     (false, true, false) => {
-                        complete_checks.push(generate_pick_complete_check(field_name));
+                        complete_checks.push(generate_slot_complete_check(field_name));
                         resolve_fields.push(generate_pick_resolve_expression(field_name));
-                        from_fields.push(generate_general_pick_conversion(field_name));
+                        from_fields.push(generate_general_slot_conversion(field_name));
                     }
                     (false, false, true) => {
                         complete_checks.push(generate_cascade_slot_complete_check(field_name));
@@ -124,18 +124,8 @@ fn generate_cascade_slot_complete_check(field_name: &Ident) -> TokenStream {
     }
 }
 
-fn generate_general_pick_conversion(field_name: &Ident) -> TokenStream {
-    quote! {
-        #field_name: schematic::Slot::FixedResolved(value.#field_name)
-    }
-}
-
 fn generate_pick_resolve_expression(field_name: &Ident) -> TokenStream {
     quote! { #field_name: self.#field_name.resolve()? }
-}
-
-fn generate_pick_complete_check(field_name: &Ident) -> TokenStream {
-    quote! { self.#field_name.is_complete() }
 }
 
 fn generate_cascade_pick_resolve_expression(field_name: &Ident) -> TokenStream {
