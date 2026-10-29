@@ -1,0 +1,5 @@
+error: `#[slot(option)]` requires an `Option<T>` field type
+ --> tests/ui/16_option_non_option_type.rs:6:16
+  |
+6 |     bad_field: String,
+  |                ^^^^^^

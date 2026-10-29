@@ -26,6 +26,8 @@ pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStrea
                             + std::iter::IntoIterator
                             + Extend<<Self::#mode_type_name as std::iter::IntoIterator>::Item>
                     }
+                } else if config.option {
+                    quote! { : Default }
                 } else {
                     quote! {}
                 };
@@ -43,6 +45,10 @@ pub fn generate_modes(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStrea
                     unresolved_fields.push(quote! { type #mode_type_name = schematic::MultiSlot<#unresolved_inner_type, #resolved_inner_type>; });
                     resolved_fields
                         .push(quote! { type #mode_type_name = Vec<#resolved_inner_type>; });
+                } else if config.option {
+                    unresolved_fields.push(quote! { type #mode_type_name = Option<schematic::SingleSlot<#unresolved_inner_type, #resolved_inner_type>>; });
+                    resolved_fields
+                        .push(quote! { type #mode_type_name = Option<#resolved_inner_type>; });
                 } else {
                     unresolved_fields.push(quote! { type #mode_type_name = schematic::SingleSlot<#unresolved_inner_type, #resolved_inner_type>; });
                     resolved_fields.push(quote! { type #mode_type_name = #resolved_inner_type; });

@@ -7,6 +7,8 @@ pub(crate) fn generate_slot_trait(ctx: &SlotFieldContext) -> TokenStream {
     let trait_def = generate_slot_trait_def(ctx);
     let trait_impls = if ctx.config.pick {
         generate_pick_slot_trait_impls(ctx)
+    } else if ctx.config.option {
+        generate_option_slot_trait_impls(ctx)
     } else {
         generate_standard_slot_trait_impls(ctx)
     };
@@ -198,6 +200,109 @@ fn generate_standard_slot_trait_impls(ctx: &SlotFieldContext) -> Vec<TokenStream
         impl<__V: std::convert::Into<#resolved_inner_type>> #trait_name<#resolved_struct> for __V {
             fn into_slot(self) -> #resolved_inner_type {
                 self.into()
+            }
+        }
+    });
+
+    trait_impls
+}
+
+fn generate_option_slot_trait_impls(ctx: &SlotFieldContext) -> Vec<TokenStream> {
+    let trait_name = &ctx.trait_name;
+    let unresolved_struct = &ctx.struct_idents.unresolved_struct;
+    let resolved_struct = &ctx.struct_idents.resolved_struct;
+    let slot_type = &ctx.slot_type;
+    let choice_type = &ctx.choice_type;
+    let unresolved_inner_type = &ctx.unresolved_inner_type;
+    let resolved_inner_type = &ctx.resolved_inner_type;
+
+    let opt_slot_ty = quote! { Option<#slot_type> };
+    let opt_resolved_ty = quote! { Option<#resolved_inner_type> };
+
+    let mut trait_impls = vec![
+        quote! {
+            #[doc(hidden)]
+            impl #trait_name<#unresolved_struct> for #slot_type {
+                fn into_slot(self) -> #opt_slot_ty {
+                    Some(self)
+                }
+            }
+        },
+        quote! {
+            #[doc(hidden)]
+            impl #trait_name<#unresolved_struct> for #unresolved_inner_type {
+                fn into_slot(self) -> #opt_slot_ty {
+                    Some(schematic::Slot::FixedUnresolved(self))
+                }
+            }
+        },
+        quote! {
+            #[doc(hidden)]
+            impl #trait_name<#unresolved_struct> for #choice_type {
+                fn into_slot(self) -> #opt_slot_ty {
+                    Some(schematic::Slot::Choose(self))
+                }
+            }
+        },
+        quote! {
+            #[doc(hidden)]
+            impl #trait_name<#unresolved_struct> for #opt_slot_ty {
+                fn into_slot(self) -> #opt_slot_ty {
+                    self
+                }
+            }
+        },
+        quote! {
+            #[doc(hidden)]
+            impl #trait_name<#unresolved_struct> for Option<#unresolved_inner_type> {
+                fn into_slot(self) -> #opt_slot_ty {
+                    self.map(schematic::Slot::FixedUnresolved)
+                }
+            }
+        },
+        quote! {
+            #[doc(hidden)]
+            impl #trait_name<#unresolved_struct> for Option<#choice_type> {
+                fn into_slot(self) -> #opt_slot_ty {
+                    self.map(schematic::Slot::Choose)
+                }
+            }
+        },
+    ];
+
+    if ctx.config.cascade {
+        trait_impls.push(quote! {
+            #[doc(hidden)]
+            impl #trait_name<#unresolved_struct> for #resolved_inner_type {
+                fn into_slot(self) -> #opt_slot_ty {
+                    Some(schematic::Slot::FixedResolved(self))
+                }
+            }
+        });
+        trait_impls.push(quote! {
+            #[doc(hidden)]
+            impl #trait_name<#unresolved_struct> for Option<#resolved_inner_type> {
+                fn into_slot(self) -> #opt_slot_ty {
+                    self.map(schematic::Slot::FixedResolved)
+                }
+            }
+        });
+    }
+
+    trait_impls.push(quote! {
+        #[doc(hidden)]
+        impl #trait_name<#resolved_struct> for #resolved_inner_type {
+            fn into_slot(self) -> #opt_resolved_ty {
+                Some(self)
+            }
+        }
+    });
+
+    trait_impls.push(quote! {
+        #[doc(hidden)]
+        impl #trait_name<#resolved_struct> for #opt_resolved_ty {
+            fn into_slot(self) -> #opt_resolved_ty {
+                self
             }
         }
     });

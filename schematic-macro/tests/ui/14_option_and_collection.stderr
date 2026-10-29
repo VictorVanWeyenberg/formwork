@@ -1,0 +1,5 @@
+error: `option` cannot be combined with `collection` or `pick` in #[slot]
+ --> tests/ui/14_option_and_collection.rs:6:5
+  |
+6 |     bad_field: Option<String>,
+  |     ^^^^^^^^^

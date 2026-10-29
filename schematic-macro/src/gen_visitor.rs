@@ -74,6 +74,15 @@ fn generate_local_visit(field_name: &Ident, config: &SlotConfig) -> TokenStream 
                 }
             }
         }
+    } else if config.option {
+        quote! {
+            if let Some(schematic::Slot::Choose(choice)) = &mut self.#field_name {
+                let flow = visitor.visit_single(choice);
+                if flow != schematic::VisitorFlow::Continue {
+                    return schematic::Level::from_flow(flow);
+                }
+            }
+        }
     } else {
         let visit_call = if config.pick {
             quote! { visitor.visit_multi(choice) }
@@ -114,8 +123,26 @@ fn generate_cascade(field_name: &Ident, config: &SlotConfig, is_dfs: bool) -> To
         generate_collection_cascade(field_name, is_dfs)
     } else if config.pick {
         generate_pick_cascade(field_name, is_dfs)
+    } else if config.option {
+        generate_option_cascade(field_name, is_dfs)
     } else {
         generate_single_cascade(field_name, is_dfs)
+    }
+}
+
+fn generate_option_cascade(field_name: &Ident, is_dfs: bool) -> TokenStream {
+    let step = child_cascade_step(is_dfs, &quote!(child));
+    quote! {
+        if let Some(slot) = &mut self.#field_name {
+            if let schematic::Slot::FixedUnresolved(child) = slot {
+                #step
+            }
+            if let Some(choice) = slot.as_choice_mut() {
+                if let Some(child) = choice.selected_value_mut() {
+                    #step
+                }
+            }
+        }
     }
 }
 

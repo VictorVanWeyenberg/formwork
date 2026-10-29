@@ -62,20 +62,33 @@ pub(crate) fn generate_slot_builder_attr(
 
     let field_name = ctx.field_name;
     let trait_name = &ctx.trait_name;
+    let accepted = if ctx.config.option {
+        "Accepts an optional item, choice, or slot."
+    } else {
+        "Accepts an item, choice, or slot."
+    };
     let doc_str = if !ctx.doc_lines.is_empty() {
         format_doc_comment(
             &format!("Sets `{}`.", field_name),
             &ctx.doc_lines,
-            Some("Accepts an item, choice, or slot."),
+            Some(accepted),
         )
     } else {
-        format!("Sets `{}`. Accepts an item, choice, or slot.", field_name)
+        format!("Sets `{}`. {}", field_name, accepted)
     };
 
-    quote! {
-        #[builder(setter(doc = #doc_str, transform = |item: impl #trait_name<M>| {
-            item.into_slot()
-        }))]
+    if ctx.config.option {
+        quote! {
+            #[builder(default, setter(doc = #doc_str, transform = |item: impl #trait_name<M>| {
+                item.into_slot()
+            }))]
+        }
+    } else {
+        quote! {
+            #[builder(setter(doc = #doc_str, transform = |item: impl #trait_name<M>| {
+                item.into_slot()
+            }))]
+        }
     }
 }
 

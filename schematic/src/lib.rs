@@ -43,15 +43,16 @@
 //! - **Normal Field (no `#[slot]`)**: For invariants that are always known upfront (e.g., entity ID, creation timestamp).
 //! - **Slot Field (`#[slot]`)**: For fields whose values may be decided later through choices.
 //!
-//! ## 2x3 Orthogonal Slot Matrix
+//! ## 2x4 Orthogonal Slot Matrix
 //!
 //! Slot attributes are configured along two orthogonal dimensions:
-//! - **Cardinality / Multiplicity**: Single (scalar value), Collection (arbitrary items or choices), or Pick (pool of candidates with cardinality constraints).
+//! - **Cardinality / Multiplicity**: Single (scalar value), Option (optional value), Collection (arbitrary items or choices), or Pick (pool of candidates with cardinality constraints).
 //! - **Hierarchy**: Leaf (resolves to concrete data directly) vs. Cascading (`cascade`, recursively resolving child schematics).
 //!
 //! | Slot Kind | Leaf (Non-Cascading) | Cascading (`cascade`) |
 //! | :--- | :--- | :--- |
 //! | **Single** | `#[slot]` | `#[slot(cascade)]` |
+//! | **Option** | `#[slot(option)]` | `#[slot(option, cascade)]` |
 //! | **Collection** | `#[slot(collection)]` | `#[slot(collection, cascade)]` |
 //! | **Pick** | `#[slot(pick)]` | `#[slot(pick, cascade)]` |
 //!
@@ -60,9 +61,11 @@
 //! | Attribute | Field Type | Unresolved Blueprint Slot | Resolves To | Description |
 //! | :--- | :--- | :--- | :--- | :--- |
 //! | `#[slot]` | `T` | `SingleSlot<T, T>` | `T` | Single item or [`SingleChoice<T>`](crate::choice::SingleChoice). |
+//! | `#[slot(option)]` | `Option<T>` | `Option<SingleSlot<T, T>>` | `Option<T>` | Optional item or [`SingleChoice<T>`](crate::choice::SingleChoice). |
 //! | `#[slot(collection)]` | `Vec<T>` | `Vec<SingleSlot<T, T>>` | `Vec<T>` | Ordered collection of individual items or [`SingleChoice<T>`](crate::choice::SingleChoice). |
 //! | `#[slot(pick)]` | `Vec<T>` | `MultiSlot<T, T>` | `Vec<T>` | Multi-selection pick slot choosing items via [`MultiChoice<T>`](crate::choice::MultiChoice). |
 //! | `#[slot(cascade)]` | `Child` | `SingleSlot<ChildSchematic, Child>` | `Child` | Cascading child schematic; resolving parent automatically resolves child. |
+//! | `#[slot(option, cascade)]` | `Option<Child>` | `Option<SingleSlot<ChildSchematic, Child>>` | `Option<Child>` | Cascading optional child schematic. |
 //! | `#[slot(collection, cascade)]` | `Vec<Child>` | `Vec<SingleSlot<ChildSchematic, Child>>` | `Vec<Child>` | Cascading collection of child schematics. |
 //! | `#[slot(pick, cascade)]` | `Vec<Child>` | `MultiSlot<ChildSchematic, Child>` | `Vec<Child>` | Cascading pick slot selecting child schematics subject to cardinality. |
 //!

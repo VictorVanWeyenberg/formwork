@@ -39,6 +39,7 @@ pub struct SlotConfig {
     pub collection: bool,
     pub pick: bool,
     pub cascade: bool,
+    pub option: bool,
 }
 
 impl SchematicStruct {
@@ -54,6 +55,7 @@ impl SchematicField {
             collection: false,
             pick: false,
             cascade: false,
+            option: false,
         };
 
         for attr in &self.attrs {
@@ -65,6 +67,8 @@ impl SchematicField {
                             config.collection = true;
                         } else if meta.path.is_ident("pick") {
                             config.pick = true;
+                        } else if meta.path.is_ident("option") {
+                            config.option = true;
                         } else if meta.path.is_ident("cascade") {
                             config.cascade = true;
                         } else {
@@ -86,6 +90,18 @@ impl SchematicField {
                 )
                 .with_span(&self.ident));
             }
+            if config.option && (config.collection || config.pick) {
+                return Err(darling::Error::custom(
+                    "`option` cannot be combined with `collection` or `pick` in #[slot]",
+                )
+                .with_span(&self.ident));
+            }
+            if config.option && self.inner_type_if_option().is_none() {
+                return Err(darling::Error::custom(
+                    "`#[slot(option)]` requires an `Option<T>` field type",
+                )
+                .with_span(&self.ty));
+            }
             if config.collection && self.inner_type_if_vec().is_none() {
                 return Err(darling::Error::custom(
                     "`#[slot(collection)]` requires a `Vec<T>` field type",
@@ -105,6 +121,15 @@ impl SchematicField {
             {
                 return Err(darling::Error::custom(
                     "`#[slot(cascade)]` cannot be used on `Vec<T>`; did you mean `#[slot(collection, cascade)]` or `#[slot(pick, cascade)]`?",
+                )
+                .with_span(&self.ty));
+            }
+            if config.cascade
+                && !config.option
+                && self.inner_type_if_option().is_some()
+            {
+                return Err(darling::Error::custom(
+                    "`#[slot(cascade)]` cannot be used on `Option<T>`; did you mean `#[slot(option, cascade)]`?",
                 )
                 .with_span(&self.ty));
             }
@@ -137,6 +162,8 @@ impl SchematicField {
     pub fn slot_item_type<'a>(&'a self, config: &SlotConfig) -> &'a Type {
         if config.collection || config.pick {
             self.inner_type_if_vec().unwrap_or(&self.ty)
+        } else if config.option {
+            self.inner_type_if_option().unwrap_or(&self.ty)
         } else {
             &self.ty
         }
@@ -166,6 +193,19 @@ impl SchematicField {
         if let syn::Type::Path(syn::TypePath { path, .. }) = &self.ty
             && let Some(segment) = path.segments.last()
             && segment.ident == "Vec"
+            && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+            && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+        {
+            Some(inner_ty)
+        } else {
+            None
+        }
+    }
+
+    pub fn inner_type_if_option(&self) -> Option<&Type> {
+        if let syn::Type::Path(syn::TypePath { path, .. }) = &self.ty
+            && let Some(segment) = path.segments.last()
+            && segment.ident == "Option"
             && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
             && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
         {
