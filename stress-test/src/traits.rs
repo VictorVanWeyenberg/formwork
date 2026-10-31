@@ -1,6 +1,6 @@
 use crate::effect::Effect;
-use crate::effect::{EffectResolved, EffectUnresolved};
-use schematic::schematic;
+use crate::effect::{EffectDry, EffectWet};
+use formwork::formwork;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -9,7 +9,7 @@ use serde_with::serde_as;
 /// Traits group one or more mechanical effects together under a common title and description.
 /// The `effects` field is a cascading collection slot (`#[slot(collection, cascade)]`),
 /// allowing child effects with choices to be resolved hierarchically.
-#[schematic(builder)]
+#[formwork(builder)]
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Trait {

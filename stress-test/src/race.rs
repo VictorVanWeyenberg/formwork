@@ -1,6 +1,6 @@
 use crate::contentref::{RaceRef, Referable, SubraceRef};
-use crate::traits::{Trait, TraitResolved, TraitUnresolved};
-use schematic::schematic;
+use crate::traits::{Trait, TraitDry, TraitWet};
+use formwork::formwork;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use std::fmt::{Display, Formatter};
@@ -9,7 +9,7 @@ use std::fmt::{Display, Formatter};
 ///
 /// Models the top-level racial identity. Traits are modeled as a cascading collection slot
 /// (`#[slot(collection, cascade)]`), allowing traits to contain choices that cascade downward.
-#[schematic(builder)]
+#[formwork(builder)]
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Race {
@@ -20,7 +20,7 @@ pub struct Race {
     name: String,
     /// Flavor and rules description.
     description: String,
-    /// Collection of racial traits granted by this race, cascading to child trait schematics.
+    /// Collection of racial traits granted by this race, cascading to child trait formworks.
     #[slot(collection, cascade)]
     pub(crate) traits: Vec<Trait>,
 }

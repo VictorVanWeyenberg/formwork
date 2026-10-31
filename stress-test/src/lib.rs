@@ -1,9 +1,9 @@
 //! # D&D 5e Character Sheet Verification Suite
 //!
 //! This crate serves as a comprehensive, end-to-end verification suite modeling the complex domain
-//! rules of a Dungeons & Dragons 5th Edition character sheet using [`schematic`].
+//! rules of a Dungeons & Dragons 5th Edition character sheet using [`formwork`].
 //!
-//! # Schematic Domain Modeling
+//! # Formwork Domain Modeling
 //!
 //! In D&D 5e, character creation involves deeply nested choices that cascade through multiple
 //! layers of rules and features:
@@ -19,9 +19,9 @@
 //!    which may be a fixed bonus (e.g. +2 Constitution) or a pending decision (e.g. "Choose one tool
 //!    proficiency from Brewer's Supplies, Mason's Tools, Smith's Tools").
 //!
-//! By utilizing `schematic`'s cascading slots, an unresolved character blueprint (`RaceSchematic`)
+//! By utilizing `formwork`'s cascading slots, a wet character formwork (`RaceFormwork`)
 //! can be created with open choices at any depth, navigated via visitors, and resolved into a
-//! watertight domain model (`Race`) once all choices are made.
+//! watertight dry domain model (`Race`) once all choices are made.
 
 #![allow(clippy::all)]
 

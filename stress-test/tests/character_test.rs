@@ -1,27 +1,27 @@
 //! Integration test suite for Test Case 18: SRD 5.1 Hill Dwarf Character Creation.
 //!
 //! Validates:
-//! 1. Construction of an unresolved `RaceSchematic` with fixed traits and choice traits.
-//! 2. Incompleteness verification and resolution failure reporting `SchematicError::UnresolvedChoice`.
+//! 1. Construction of a wet `RaceFormwork` with fixed traits and choice traits.
+//! 2. Incompleteness verification and resolution failure reporting `FormworkError::WetChoice`.
 //! 3. Manual selection of Option 1 (Brewer's Supplies) satisfying all open choices.
 //! 4. Resolution into a watertight `Race` domain model.
 //! 5. Verification of race name and traits via clean public getters (`name()`, `traits()`, `effects()`, `operation()`).
 //! 6. Serde roundtrip JSON serialization and deserialization with structural equality.
 //! 7. Automatic resolution via `AutoSelectFirst` choosing Option 0 (Smith's Tools).
 
-use schematic::Schematic;
-use schematic::choice::{MultiChoice, SingleChoice};
-use schematic::error::SchematicError;
-use schematic::visitor::{AutoSelectFirst, ChoiceVisitor, VisitorFlow};
+use formwork::Formwork;
+use formwork::choice::{MultiChoice, SingleChoice};
+use formwork::error::FormworkError;
+use formwork::visitor::{AutoSelectFirst, ChoiceVisitor, VisitorFlow};
 use stress_test::contentref::{RaceRef, Referable, SubraceRef, ToolRef};
 use stress_test::damage::{DamageModulation, DamageType};
-use stress_test::effect::{Effect, EffectId, EffectSchematic, SheetOperation};
+use stress_test::effect::{Effect, EffectId, EffectFormwork, SheetOperation};
 use stress_test::proficiency::Proficiency;
-use stress_test::race::{Race, RaceSchematic, Subrace};
+use stress_test::race::{Race, RaceFormwork, Subrace};
 use stress_test::roll::{
     RollDescription, SavingThrowAgainst, SavingThrowKind, VantageOnRoll, VantageStatus,
 };
-use stress_test::traits::{Trait, TraitSchematic};
+use stress_test::traits::{Trait, TraitFormwork};
 use stress_test::valueref::{SheetRef, ValueRef};
 
 /// Visitor to select a specific choice option by index across all encountered `SingleChoice`s.
@@ -73,12 +73,12 @@ fn dwarven_resilience() -> Trait {
 /// - Option 0: Smith's Tools (`srd/tool/smithstools`)
 /// - Option 1: Brewer's Supplies (`srd/tool/brewersupplies`)
 /// - Option 2: Mason's Tools (`srd/tool/masonstools`)
-fn dwarven_tool_proficiency() -> TraitSchematic {
+fn dwarven_tool_proficiency() -> TraitFormwork {
     let smiths_tools: ToolRef = "srd/tool/smithstools".parse().unwrap();
     let brewers_supplies: ToolRef = "srd/tool/brewersupplies".parse().unwrap();
     let masons_tools: ToolRef = "srd/tool/masonstools".parse().unwrap();
 
-    let effect = EffectSchematic::builder()
+    let effect = EffectFormwork::builder()
         .id(EffectId::default())
         .operation(SingleChoice::new(
             "Dwarven Tool Proficiency",
@@ -90,7 +90,7 @@ fn dwarven_tool_proficiency() -> TraitSchematic {
         ))
         .build();
 
-    TraitSchematic::builder()
+    TraitFormwork::builder()
         .title("Dwarven Tool Proficiency".to_string())
         .description(
             "You have proficiency with the artisan's tools of your choice: smith's tools, brewer's supplies, or mason's tools."
@@ -128,9 +128,9 @@ fn hill_dwarf_subrace() -> Subrace {
     )
 }
 
-/// Constructs an unresolved `RaceSchematic` for a Hill Dwarf character.
-fn build_dwarf_schematic() -> RaceSchematic {
-    RaceSchematic::builder()
+/// Constructs a wet `RaceFormwork` for a Hill Dwarf character.
+fn build_dwarf_formwork() -> RaceFormwork {
+    RaceFormwork::builder()
         .id("srd/race/dwarf".parse::<RaceRef>().unwrap())
         .name("Dwarf")
         .description(
@@ -145,14 +145,14 @@ fn build_dwarf_schematic() -> RaceSchematic {
 
 #[test]
 fn test_hill_dwarf_character_creation_suite() {
-    // 1. Construct dwarf_bp: RaceSchematic -> assert !is_complete(), resolve() fails with UnresolvedChoice
-    let mut dwarf_bp: RaceSchematic = build_dwarf_schematic();
+    // 1. Construct dwarf_bp: RaceFormwork -> assert !is_complete(), resolve() fails with WetChoice
+    let mut dwarf_bp: RaceFormwork = build_dwarf_formwork();
     assert!(!dwarf_bp.is_complete());
 
     let resolve_err = dwarf_bp.clone().resolve().unwrap_err();
     assert_eq!(
         resolve_err,
-        SchematicError::UnresolvedChoice {
+        FormworkError::WetChoice {
             prompt: "Dwarven Tool Proficiency".to_string()
         }
     );
@@ -161,7 +161,7 @@ fn test_hill_dwarf_character_creation_suite() {
     dwarf_bp.walk_choices(&mut SelectOption(1));
     assert!(dwarf_bp.is_complete());
 
-    // 3. Resolve into watertight domain model
+    // 3. Resolve into watertight dry domain model
     let resolved_race: Race = dwarf_bp.resolve().unwrap();
 
     // 4. Assert resolved_race.name() == "Dwarf"
@@ -219,7 +219,7 @@ fn test_hill_dwarf_character_creation_suite() {
     assert_eq!(resolved_race, deserialized_race);
 
     // 7. Test walk_choices(&mut AutoSelectFirst) selects Option 0 (Smith's Tools) and resolves cleanly
-    let mut auto_dwarf_bp = build_dwarf_schematic();
+    let mut auto_dwarf_bp = build_dwarf_formwork();
     assert!(!auto_dwarf_bp.is_complete());
 
     auto_dwarf_bp.walk_choices(&mut AutoSelectFirst);

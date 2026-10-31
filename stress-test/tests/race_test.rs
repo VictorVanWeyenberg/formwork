@@ -1,25 +1,25 @@
-//! End-to-end integration test demonstrating character race building with `schematic`.
+//! End-to-end integration test demonstrating character race building with `formwork`.
 //!
-//! Verifies builder ergonomics, mixing resolved traits and unresolved choice traits,
+//! Verifies builder ergonomics, mixing dry traits and wet choice traits,
 //! and serialization of complex D&D 5e racial trait hierarchies.
 
-use schematic::choice::SingleChoice;
+use formwork::choice::SingleChoice;
 use stress_test::ability::{Ability, AbilityScoreIncrease};
 use stress_test::contentref::{RaceRef, SourceRef, ToolRef};
-use stress_test::effect::{Effect, EffectId, EffectSchematic, SheetOperation};
+use stress_test::effect::{Effect, EffectId, EffectFormwork, SheetOperation};
 use stress_test::proficiency::Proficiency;
-use stress_test::race::RaceSchematic;
-use stress_test::traits::{Trait, TraitSchematic};
+use stress_test::race::RaceFormwork;
+use stress_test::traits::{Trait, TraitFormwork};
 
 fn source_ref() -> SourceRef {
     SourceRef::new("srd").unwrap()
 }
 
-/// Verifies that [`RaceSchematic::builder`] can assemble a racial blueprint containing both
-/// fixed resolved traits and unresolved choice traits via cascading `.with_traits(...)`.
+/// Verifies that [`RaceFormwork::builder`] can assemble a racial formwork containing both
+/// fixed dry traits and wet choice traits via cascading `.with_traits(...)`.
 #[test]
 fn main() {
-    let race = RaceSchematic::builder()
+    let race = RaceFormwork::builder()
         .id(RaceRef::new(source_ref(), "dwarf").unwrap())
         .name("Dwarf")
         .description("Dwarf test")
@@ -28,10 +28,10 @@ fn main() {
         .build();
     let json = serde_json::to_string_pretty(&race).unwrap();
     println!("{}", json);
-    let _race: RaceSchematic = serde_json::from_str(&json).unwrap();
+    let _race: RaceFormwork = serde_json::from_str(&json).unwrap();
 }
 
-/// Constructs a fully resolved [`Trait`] (Dwarf Ability Score Increase: +2 Constitution)
+/// Constructs a fully dry [`Trait`] (Dwarf Ability Score Increase: +2 Constitution)
 /// using the generated [`Trait::builder`] and [`Effect::builder`].
 fn ability_score_increase() -> Trait {
     let effect = Effect::builder()
@@ -50,10 +50,10 @@ fn ability_score_increase() -> Trait {
         .build()
 }
 
-/// Constructs an unresolved [`TraitSchematic`] (Dwarf Tool Proficiency) containing a
+/// Constructs a wet [`TraitFormwork`] (Dwarf Tool Proficiency) containing a
 /// [`SingleChoice`] for picking one tool proficiency from three options.
-fn tool_proficiency() -> TraitSchematic {
-    let effect = EffectSchematic::builder()
+fn tool_proficiency() -> TraitFormwork {
+    let effect = EffectFormwork::builder()
         .id(EffectId::default())
         .operation(SingleChoice::new(
             "Pick one tool to be proficient with",
@@ -70,7 +70,7 @@ fn tool_proficiency() -> TraitSchematic {
             ],
         ))
         .build();
-    TraitSchematic::builder()
+    TraitFormwork::builder()
         .title("Tool Proficiency".to_string())
         .description("Tool Proficiency".to_string())
         .with_effects(effect)

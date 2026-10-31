@@ -1,3 +1,3 @@
 [workspace]
-members = ["schematic", "schematic-core", "schematic-macro", "stress-test"]
+members = ["formwork", "formwork-core", "formwork-macro", "stress-test"]
 resolver = "2"

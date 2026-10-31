@@ -1,6 +1,6 @@
-use schematic::{SingleChoice, schematic};
+use formwork::{SingleChoice, formwork};
 
-#[schematic(builder)]
+#[formwork(builder)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Parent {
     first_child: Child,
@@ -11,8 +11,8 @@ pub struct Parent {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Child;
 
-pub fn parent() -> ParentSchematic {
-    ParentSchematic::builder()
+pub fn parent() -> ParentFormwork {
+    ParentFormwork::builder()
         .first_child(Child)
         .with_second_child(Child)
         .with_second_child(Child)

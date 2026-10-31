@@ -1,0 +1,22 @@
+[package]
+name = "formwork-macro"
+version = "0.1.0"
+edition = "2024"
+description = "Procedural macros for the formwork architecture"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+darling = "0.24.1"
+ident_case = "1.0.1"
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+syn = { version = "3.0.6", features = ["full"] }
+
+[dev-dependencies]
+formwork = { path = "../formwork" }
+typed-builder = "0.23"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+trybuild = "1.0.121"

@@ -5,7 +5,7 @@ use crate::proficiency::Proficiency;
 use crate::race::{Size, Speed, Vision};
 use crate::roll::VantageOnRoll;
 use crate::valueref::ValueRef;
-use schematic::schematic;
+use formwork::formwork;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -31,10 +31,10 @@ impl EffectId {
 
 /// A discrete mechanical modification applied to a character sheet.
 ///
-/// `Effect` serves as the leaf node in the schematic tree. Its `operation` field is a single
-/// slot (`#[slot]`), allowing it to hold either a fixed resolved operation (such as +2 Constitution)
+/// `Effect` serves as the leaf node in the formwork tree. Its `operation` field is a single
+/// slot (`#[slot]`), allowing it to hold either a fixed dry operation (such as +2 Constitution)
 /// or a choice (such as "Choose one tool proficiency from Brewer's Supplies, Mason's Tools, Smith's Tools").
-#[schematic(builder)]
+#[formwork(builder)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Effect {
     /// Optional identifier for tracking or removing effects.
