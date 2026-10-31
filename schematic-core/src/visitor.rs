@@ -9,6 +9,25 @@ pub enum VisitorFlow {
     Continue,
     /// Halt traversal immediately.
     Break,
+    /// Rewind traversal to the previous made choice, unmaking it.
+    Back,
+}
+
+impl VisitorFlow {
+    /// Returns `true` if this signal is [`VisitorFlow::Continue`].
+    pub fn is_continue(self) -> bool {
+        self == Self::Continue
+    }
+
+    /// Returns `true` if this signal is [`VisitorFlow::Break`].
+    pub fn is_break(self) -> bool {
+        self == Self::Break
+    }
+
+    /// Returns `true` if this signal is [`VisitorFlow::Back`].
+    pub fn is_back(self) -> bool {
+        self == Self::Back
+    }
 }
 
 /// A visitor for walking through and interacting with choices across a schematic hierarchy.

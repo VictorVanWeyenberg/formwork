@@ -21,7 +21,9 @@
 //! | [`Cardinality`] | Specifies selection limits on multi-choices (`Exact(n)`, `UpTo(n)`, `AtLeast(n)`). |
 //! | [`Schematic`] | The primary trait implemented by unresolved blueprints (`<Name>Schematic`), providing completeness checks, resolution into watertight models, and tree traversal. |
 //! | [`ChoiceVisitor`] | Trait for implementing custom choice traversal logic across a schematic tree. |
-//! | [`VisitorFlow`] | Control flow signal (`Continue` or `Break`) returned during choice visitation. |
+//! | [`VisitorFlow`] | Control flow signal (`Continue`, `Break`, or `Back`) returned during choice visitation. |
+//! | [`SchematicSession`] | An interactive session driving choices one-by-one with caller control and rewind support. |
+//! | [`StepResult`] | Outcome of stepping through an interactive session (`Choice`, `Complete`, or `AtStart`). |
 //! | [`AutoSelectFirst`], [`ConfirmAll`], [`UnmakeAll`] | Built-in visitor implementations for common operations (batch selection, unmaking, re-confirming). |
 //! | [`SchematicError`] | Error type returned when choice constraints are violated or an incomplete schematic is resolved. |
 //!
@@ -62,6 +64,6 @@ pub mod visitor;
 
 pub use choice::{Cardinality, ChoiceState, MultiChoice, SingleChoice};
 pub use error::SchematicError;
-pub use schematic_trait::{Level, Schematic, Walkable};
+pub use schematic_trait::{Level, Schematic, SchematicSession, StepOutcome, StepResult, Walkable};
 pub use slot::{MultiSlot, SingleSlot, Slot};
 pub use visitor::{AutoSelectFirst, ChoiceVisitor, ConfirmAll, UnmakeAll, VisitorFlow};

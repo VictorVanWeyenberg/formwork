@@ -6,9 +6,13 @@ use syn::Ident;
 #[derive(Default)]
 struct VisitorParts {
     visitor_bounds: Vec<TokenStream>,
-    local_logic: Vec<TokenStream>,
-    cascade_logic: Vec<TokenStream>,
     has_cascade: bool,
+    dfs_steps: Vec<TokenStream>,
+    dfs_unmakes: Vec<TokenStream>,
+    bfs_steps: Vec<TokenStream>,
+    bfs_unmakes: Vec<TokenStream>,
+    bfs_cascade_steps: Vec<TokenStream>,
+    bfs_cascade_unmakes: Vec<TokenStream>,
 }
 
 pub fn generate_visitor(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStream {
@@ -27,14 +31,25 @@ pub fn generate_visitor(ast: &SchematicStruct, args: &SchematicArgs) -> TokenStr
 fn collect_visitor_parts(ast: &SchematicStruct, is_dfs: bool) -> VisitorParts {
     let mut parts = VisitorParts::default();
     if let darling::ast::Data::Struct(fields) = &ast.data {
+        let has_cascade = fields
+            .fields
+            .iter()
+            .any(|f| f.slot_config().ok().flatten().is_some_and(|c| c.cascade));
+        parts.has_cascade = has_cascade;
+
         for field in &fields.fields {
-            process_field(field, is_dfs, &mut parts);
+            process_field(field, is_dfs, has_cascade, &mut parts);
         }
     }
     parts
 }
 
-fn process_field(field: &SchematicField, is_dfs: bool, parts: &mut VisitorParts) {
+fn process_field(
+    field: &SchematicField,
+    is_dfs: bool,
+    has_cascade: bool,
+    parts: &mut VisitorParts,
+) {
     let Some(config) = field.slot_config().unwrap() else {
         return;
     };
@@ -45,42 +60,64 @@ fn process_field(field: &SchematicField, is_dfs: bool, parts: &mut VisitorParts)
         V: schematic::ChoiceVisitor<#unresolved_inner_type>
     });
 
-    parts.local_logic.push(generate_local_visit(field_name, &config));
+    if is_dfs {
+        parts
+            .dfs_steps
+            .push(generate_local_step_dfs(field_name, &config));
+        parts
+            .dfs_unmakes
+            .push(generate_local_unmake_dfs(field_name, &config));
+    } else {
+        parts
+            .bfs_steps
+            .push(generate_local_step_bfs(field_name, &config, has_cascade));
+        parts
+            .bfs_unmakes
+            .push(generate_local_unmake_bfs(field_name, &config, has_cascade));
+    }
 
     if config.cascade {
         parts.visitor_bounds.push(quote! {
             #unresolved_inner_type: schematic::Walkable<V>
         });
-        parts.has_cascade = true;
 
-        let cascade = generate_cascade(field_name, &config, is_dfs);
         if is_dfs {
-            parts.local_logic.push(cascade);
+            parts
+                .dfs_steps
+                .push(generate_cascade_dfs_step(field_name, &config));
+            parts
+                .dfs_unmakes
+                .push(generate_cascade_dfs_unmake(field_name, &config));
         } else {
-            parts.cascade_logic.push(cascade);
+            parts
+                .bfs_cascade_steps
+                .push(generate_cascade_bfs_step(field_name, &config));
+                parts
+                .bfs_cascade_unmakes
+                .push(generate_cascade_bfs_unmake(field_name, &config));
         }
     }
 }
 
-fn generate_local_visit(field_name: &Ident, config: &SlotConfig) -> TokenStream {
+fn generate_local_step_dfs(field_name: &Ident, config: &SlotConfig) -> TokenStream {
     if config.collection {
         quote! {
             for slot in &mut self.#field_name {
                 if let schematic::Slot::Choose(choice) = slot {
-                    let flow = visitor.visit_single(choice);
-                    if flow != schematic::VisitorFlow::Continue {
-                        return schematic::Level::from_flow(flow);
+                    if *current == target {
+                        return schematic::StepOutcome::Visited(visitor.visit_single(choice));
                     }
+                    *current += 1;
                 }
             }
         }
     } else if config.option {
         quote! {
             if let Some(schematic::Slot::Choose(choice)) = &mut self.#field_name {
-                let flow = visitor.visit_single(choice);
-                if flow != schematic::VisitorFlow::Continue {
-                    return schematic::Level::from_flow(flow);
+                if *current == target {
+                    return schematic::StepOutcome::Visited(visitor.visit_single(choice));
                 }
+                *current += 1;
             }
         }
     } else {
@@ -91,136 +128,257 @@ fn generate_local_visit(field_name: &Ident, config: &SlotConfig) -> TokenStream 
         };
         quote! {
             if let schematic::Slot::Choose(choice) = &mut self.#field_name {
-                let flow = #visit_call;
-                if flow != schematic::VisitorFlow::Continue {
-                    return schematic::Level::from_flow(flow);
+                if *current == target {
+                    return schematic::StepOutcome::Visited(#visit_call);
                 }
+                *current += 1;
             }
         }
     }
 }
 
-fn child_cascade_step(is_dfs: bool, child: &TokenStream) -> TokenStream {
-    if is_dfs {
-        quote! {
-            let flow = schematic::Schematic::walk_choices(#child, visitor);
-            if flow == schematic::VisitorFlow::Break {
-                return schematic::Level::from_flow(flow);
-            }
-        }
-    } else {
-        quote! {
-            level.combine(#child.walk_level(visitor, depth - 1));
-            if level.flow == schematic::VisitorFlow::Break {
-                return level;
-            }
-        }
-    }
-}
-
-fn generate_cascade(field_name: &Ident, config: &SlotConfig, is_dfs: bool) -> TokenStream {
+fn generate_local_unmake_dfs(field_name: &Ident, config: &SlotConfig) -> TokenStream {
     if config.collection {
-        generate_collection_cascade(field_name, is_dfs)
-    } else if config.pick {
-        generate_pick_cascade(field_name, is_dfs)
+        quote! {
+            for slot in &mut self.#field_name {
+                if let schematic::Slot::Choose(choice) = slot {
+                    if *current == target {
+                        let _ = choice.unmake();
+                        return true;
+                    }
+                    *current += 1;
+                }
+            }
+        }
     } else if config.option {
-        generate_option_cascade(field_name, is_dfs)
+        quote! {
+            if let Some(schematic::Slot::Choose(choice)) = &mut self.#field_name {
+                if *current == target {
+                    let _ = choice.unmake();
+                    return true;
+                }
+                *current += 1;
+            }
+        }
     } else {
-        generate_single_cascade(field_name, is_dfs)
+        quote! {
+            if let schematic::Slot::Choose(choice) = &mut self.#field_name {
+                if *current == target {
+                    let _ = choice.unmake();
+                    return true;
+                }
+                *current += 1;
+            }
+        }
     }
 }
 
-fn generate_option_cascade(field_name: &Ident, is_dfs: bool) -> TokenStream {
-    let step = child_cascade_step(is_dfs, &quote!(child));
-    quote! {
-        if let Some(slot) = &mut self.#field_name {
-            if let schematic::Slot::FixedUnresolved(child) = slot {
-                #step
+fn generate_local_step_bfs(
+    field_name: &Ident,
+    config: &SlotConfig,
+    has_cascade: bool,
+) -> TokenStream {
+    if config.collection {
+        quote! {
+            for slot in &mut self.#field_name {
+                if let schematic::Slot::Choose(choice) = slot {
+                    if *current == target {
+                        return (schematic::StepOutcome::Visited(visitor.visit_single(choice)), #has_cascade);
+                    }
+                    *current += 1;
+                }
             }
-            if let Some(choice) = slot.as_choice_mut() {
+        }
+    } else if config.option {
+        quote! {
+            if let Some(schematic::Slot::Choose(choice)) = &mut self.#field_name {
+                if *current == target {
+                    return (schematic::StepOutcome::Visited(visitor.visit_single(choice)), #has_cascade);
+                }
+                *current += 1;
+            }
+        }
+    } else {
+        let visit_call = if config.pick {
+            quote! { visitor.visit_multi(choice) }
+        } else {
+            quote! { visitor.visit_single(choice) }
+        };
+        quote! {
+            if let schematic::Slot::Choose(choice) = &mut self.#field_name {
+                if *current == target {
+                    return (schematic::StepOutcome::Visited(#visit_call), #has_cascade);
+                }
+                *current += 1;
+            }
+        }
+    }
+}
+
+fn generate_local_unmake_bfs(
+    field_name: &Ident,
+    config: &SlotConfig,
+    has_cascade: bool,
+) -> TokenStream {
+    if config.collection {
+        quote! {
+            for slot in &mut self.#field_name {
+                if let schematic::Slot::Choose(choice) = slot {
+                    if *current == target {
+                        let _ = choice.unmake();
+                        return (true, #has_cascade);
+                    }
+                    *current += 1;
+                }
+            }
+        }
+    } else if config.option {
+        quote! {
+            if let Some(schematic::Slot::Choose(choice)) = &mut self.#field_name {
+                if *current == target {
+                    let _ = choice.unmake();
+                    return (true, #has_cascade);
+                }
+                *current += 1;
+            }
+        }
+    } else {
+        quote! {
+            if let schematic::Slot::Choose(choice) = &mut self.#field_name {
+                if *current == target {
+                    let _ = choice.unmake();
+                    return (true, #has_cascade);
+                }
+                *current += 1;
+            }
+        }
+    }
+}
+
+fn wrap_cascade_target(field_name: &Ident, config: &SlotConfig, body: TokenStream) -> TokenStream {
+    if config.collection {
+        quote! {
+            for slot in &mut self.#field_name {
+                if let schematic::Slot::FixedUnresolved(child) = slot {
+                    #body
+                }
+                if let Some(choice) = slot.as_choice_mut() {
+                    if let Some(child) = choice.selected_value_mut() {
+                        #body
+                    }
+                }
+            }
+        }
+    } else if config.option {
+        quote! {
+            if let Some(slot) = &mut self.#field_name {
+                if let schematic::Slot::FixedUnresolved(child) = slot {
+                    #body
+                }
+                if let Some(choice) = slot.as_choice_mut() {
+                    if let Some(child) = choice.selected_value_mut() {
+                        #body
+                    }
+                }
+            }
+        }
+    } else if config.pick {
+        quote! {
+            if let schematic::Slot::FixedUnresolved(children) = &mut self.#field_name {
+                for child in children {
+                    #body
+                }
+            }
+            if let Some(choice) = self.#field_name.as_choice_mut() {
+                for child in choice.selected_values_mut() {
+                    #body
+                }
+            }
+        }
+    } else {
+        quote! {
+            if let schematic::Slot::FixedUnresolved(child) = &mut self.#field_name {
+                #body
+            }
+            if let Some(choice) = self.#field_name.as_choice_mut() {
                 if let Some(child) = choice.selected_value_mut() {
-                    #step
+                    #body
                 }
             }
         }
     }
 }
 
-fn generate_single_cascade(field_name: &Ident, is_dfs: bool) -> TokenStream {
-    let step = child_cascade_step(is_dfs, &quote!(child));
-    quote! {
-        if let schematic::Slot::FixedUnresolved(ref mut child) = self.#field_name {
-            #step
-        }
-        if let Some(choice) = self.#field_name.as_choice_mut() {
-            if let Some(child) = choice.selected_value_mut() {
-                #step
+fn generate_cascade_dfs_step(field_name: &Ident, config: &SlotConfig) -> TokenStream {
+    wrap_cascade_target(
+        field_name,
+        config,
+        quote! {
+            let outcome = schematic::Walkable::<V>::walk_step(child, visitor, target, current);
+            if let schematic::StepOutcome::Visited(_) = outcome {
+                return outcome;
             }
-        }
-    }
+        },
+    )
 }
 
-fn generate_collection_cascade(field_name: &Ident, is_dfs: bool) -> TokenStream {
-    let step = child_cascade_step(is_dfs, &quote!(child));
-    quote! {
-        for slot in &mut self.#field_name {
-            if let schematic::Slot::FixedUnresolved(child) = slot {
-                #step
+fn generate_cascade_dfs_unmake(field_name: &Ident, config: &SlotConfig) -> TokenStream {
+    wrap_cascade_target(
+        field_name,
+        config,
+        quote! {
+            if schematic::Walkable::<V>::unmake_at_index(child, target, current) {
+                return true;
             }
-            if let Some(choice) = slot.as_choice_mut() {
-                if let Some(child) = choice.selected_value_mut() {
-                    #step
-                }
-            }
-        }
-    }
+        },
+    )
 }
 
-fn generate_pick_cascade(field_name: &Ident, is_dfs: bool) -> TokenStream {
-    let step = child_cascade_step(is_dfs, &quote!(child));
-    quote! {
-        if let schematic::Slot::FixedUnresolved(children) = &mut self.#field_name {
-            for child in children {
-                #step
+fn generate_cascade_bfs_step(field_name: &Ident, config: &SlotConfig) -> TokenStream {
+    wrap_cascade_target(
+        field_name,
+        config,
+        quote! {
+            let (outcome, child_deeper) =
+                schematic::Walkable::<V>::walk_step_level(child, visitor, depth - 1, target, current);
+            if child_deeper {
+                deeper = true;
             }
-        }
-        if let Some(choice) = self.#field_name.as_choice_mut() {
-            for child in choice.selected_values_mut() {
-                #step
+            if let schematic::StepOutcome::Visited(_) = outcome {
+                return (outcome, true);
             }
-        }
-    }
+        },
+    )
+}
+
+fn generate_cascade_bfs_unmake(field_name: &Ident, config: &SlotConfig) -> TokenStream {
+    wrap_cascade_target(
+        field_name,
+        config,
+        quote! {
+            let (unmade, child_deeper) =
+                schematic::Walkable::<V>::unmake_step_level(child, depth - 1, target, current);
+            if child_deeper {
+                deeper = true;
+            }
+            if unmade {
+                return (true, true);
+            }
+        },
+    )
 }
 
 fn generate_empty_walkable(name: &Ident, unresolved_struct: &Ident) -> TokenStream {
     quote! {
         impl<V> schematic::Walkable<V> for #name<#unresolved_struct> {
-            fn walk_level(&mut self, _visitor: &mut V, _depth: usize) -> schematic::Level {
-                schematic::Level::continue_level(false)
+            fn walk_step(&mut self, _visitor: &mut V, _target: usize, _current: &mut usize) -> schematic::StepOutcome {
+                schematic::StepOutcome::Exhausted
+            }
+
+            fn unmake_at_index(&mut self, _target: usize, _current: &mut usize) -> bool {
+                false
             }
         }
-    }
-}
-
-fn strategy_walk_branches(
-    is_dfs: bool,
-    has_cascade: bool,
-    cascade_logic: &[TokenStream],
-) -> (TokenStream, TokenStream) {
-    if is_dfs {
-        (
-            quote! { false },
-            quote! { schematic::Level::continue_level(false) },
-        )
-    } else {
-        (
-            quote! { #has_cascade },
-            quote! {
-                let mut level = schematic::Level::continue_level(false);
-                #(#cascade_logic)*
-                level
-            },
-        )
     }
 }
 
@@ -231,21 +389,115 @@ fn generate_walkable_impl(
     is_dfs: bool,
 ) -> TokenStream {
     let visitor_bounds = &parts.visitor_bounds;
-    let local_logic = &parts.local_logic;
-    let (depth_zero_continuation, depth_n_body) =
-        strategy_walk_branches(is_dfs, parts.has_cascade, &parts.cascade_logic);
 
-    quote! {
-        impl<V> schematic::Walkable<V> for #name<#unresolved_struct>
-        where
-            #(#visitor_bounds),*
-        {
-            fn walk_level(&mut self, visitor: &mut V, depth: usize) -> schematic::Level {
-                if depth == 0 {
-                    #(#local_logic)*
-                    schematic::Level::continue_level(#depth_zero_continuation)
-                } else {
-                    #depth_n_body
+    if is_dfs {
+        let dfs_steps = &parts.dfs_steps;
+        let dfs_unmakes = &parts.dfs_unmakes;
+        quote! {
+            impl<V> schematic::Walkable<V> for #name<#unresolved_struct>
+            where
+                #(#visitor_bounds),*
+            {
+                fn walk_step(&mut self, visitor: &mut V, target: usize, current: &mut usize) -> schematic::StepOutcome {
+                    #(#dfs_steps)*
+                    schematic::StepOutcome::Exhausted
+                }
+
+                fn unmake_at_index(&mut self, target: usize, current: &mut usize) -> bool {
+                    #(#dfs_unmakes)*
+                    false
+                }
+            }
+        }
+    } else {
+        let bfs_steps = &parts.bfs_steps;
+        let bfs_unmakes = &parts.bfs_unmakes;
+        let bfs_cascade_steps = &parts.bfs_cascade_steps;
+        let bfs_cascade_unmakes = &parts.bfs_cascade_unmakes;
+        let has_cascade = parts.has_cascade;
+
+        let (depth_n_step_body, depth_n_unmake_body) = if has_cascade {
+            (
+                quote! {
+                    let mut deeper = false;
+                    #(#bfs_cascade_steps)*
+                    (schematic::StepOutcome::Exhausted, deeper)
+                },
+                quote! {
+                    let mut deeper = false;
+                    #(#bfs_cascade_unmakes)*
+                    (false, deeper)
+                },
+            )
+        } else {
+            (
+                quote! { (schematic::StepOutcome::Exhausted, false) },
+                quote! { (false, false) },
+            )
+        };
+
+        quote! {
+            impl<V> schematic::Walkable<V> for #name<#unresolved_struct>
+            where
+                #(#visitor_bounds),*
+            {
+                fn walk_step(&mut self, visitor: &mut V, target: usize, current: &mut usize) -> schematic::StepOutcome {
+                    let mut depth = 0;
+                    loop {
+                        let (outcome, deeper) =
+                            schematic::Walkable::<V>::walk_step_level(self, visitor, depth, target, current);
+                        if let schematic::StepOutcome::Visited(_) = outcome {
+                            return outcome;
+                        }
+                        if !deeper {
+                            return schematic::StepOutcome::Exhausted;
+                        }
+                        depth += 1;
+                    }
+                }
+
+                fn unmake_at_index(&mut self, target: usize, current: &mut usize) -> bool {
+                    let mut depth = 0;
+                    loop {
+                        let (unmade, deeper) =
+                            schematic::Walkable::<V>::unmake_step_level(self, depth, target, current);
+                        if unmade {
+                            return true;
+                        }
+                        if !deeper {
+                            return false;
+                        }
+                        depth += 1;
+                    }
+                }
+
+                fn walk_step_level(
+                    &mut self,
+                    visitor: &mut V,
+                    depth: usize,
+                    target: usize,
+                    current: &mut usize,
+                ) -> (schematic::StepOutcome, bool) {
+                    if depth == 0 {
+                        #(#bfs_steps)*
+                        (schematic::StepOutcome::Exhausted, #has_cascade)
+                    } else {
+                        #depth_n_step_body
+                    }
+                }
+
+                fn unmake_step_level(
+                    &mut self,
+                    depth: usize,
+                    target: usize,
+                    current: &mut usize,
+                ) -> (bool, bool) {
+                    if depth == 0 {
+                        #(#bfs_unmakes)*
+                        (false, #has_cascade)
+                    } else {
+                        #depth_n_unmake_body
+                    }
                 }
             }
         }
