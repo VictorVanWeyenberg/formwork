@@ -472,11 +472,11 @@ fn test_dfs_all_six_slot_kinds_traversal_and_autoselect() {
 }
 
 // ============================================================================
-// 5. From<Resolved> Symmetric Roundtrip
+// 5. From<Dry> Symmetric Roundtrip
 // ============================================================================
 
 #[test]
-fn test_from_resolved_roundtrip_all_slot_kinds() {
+fn test_from_dry_roundtrip_all_slot_kinds() {
     let resolved_model = AdversarialRootBfs {
         code: 9999usize,
         single_leaf: "leaf_final".to_string(),

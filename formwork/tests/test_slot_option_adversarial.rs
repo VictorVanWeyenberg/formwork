@@ -76,7 +76,7 @@ fn test_deeply_nested_cascading_option_all_present_bfs() {
     let r_leaf = r_node.leaf.expect("leaf must be Some");
     assert_eq!(r_leaf.val, "L1");
 
-    // From<Resolved> roundtrip
+    // From<Dry> roundtrip
     let back: DeepRootBfsFormwork = resolved.into();
     assert!(back.is_complete());
     assert!(matches!(back.mid, Some(SingleSlot::FixedDry(_))));
@@ -248,7 +248,7 @@ fn test_serde_json_roundtrip_none_slots() {
     assert_eq!(resolved.opt_scalar, None);
     assert_eq!(resolved.opt_child, None);
 
-    // Resolved struct serde roundtrip
+    // Dry struct serde roundtrip
     let res_json = serde_json::to_string(&resolved).expect("must serialize resolved");
     let res_deserialized: SerdeParent =
         serde_json::from_str(&res_json).expect("must deserialize resolved");
@@ -666,13 +666,13 @@ fn test_full_eight_slot_matrix_all_populated_with_choices() {
     assert_eq!(resolved.pick_leaf, vec!["pl_1".to_string()]);
     assert_eq!(resolved.pick_cascade, vec![MatrixChild { val: "pc_val".to_string() }]);
 
-    // From<Resolved> roundtrip
+    // From<Dry> roundtrip
     let back: FullEightSlotMatrixFormwork = resolved.into();
     assert!(back.is_complete());
 }
 
 // ============================================================================
-// 6. Direct Resolved Builder Ergonomics for Optional Slots
+// 6. Direct Dry Builder Ergonomics for Optional Slots
 // ============================================================================
 
 #[test]

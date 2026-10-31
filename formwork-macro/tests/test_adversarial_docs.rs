@@ -104,7 +104,7 @@ fn test_adversarial_entity_builder_and_resolution() {
         .with_collection_cascade(
             ChildEntityFormwork::builder()
                 .id("child-2")
-                .details("ResolvedDetail".to_string())
+                .details("DryDetail".to_string())
                 .build(),
         )
         .build();
@@ -127,7 +127,7 @@ fn test_adversarial_entity_builder_and_resolution() {
     assert_eq!(resolved.single_cascade.details, "DetailA");
     assert_eq!(resolved.collection_cascade.len(), 1);
     assert_eq!(resolved.collection_cascade[0].id, "child-2");
-    assert_eq!(resolved.collection_cascade[0].details, "ResolvedDetail");
+    assert_eq!(resolved.collection_cascade[0].details, "DryDetail");
 }
 
 #[test]

@@ -465,8 +465,8 @@ fn test_4_3_single_cascade_choice_of_child_formworks() {
 #[test]
 fn test_4_4_single_cascade_pre_resolved_child() {
     let resolved_child: ChildSlotNode = ChildSlotNode {
-        id: "PreResolvedId".to_string(),
-        value: "PreResolvedVal".to_string(),
+        id: "PreDryId".to_string(),
+        value: "PreDryVal".to_string(),
     };
 
     let parent = ParentSingleCascade::builder()
@@ -481,8 +481,8 @@ fn test_4_4_single_cascade_pre_resolved_child() {
         ParentSingleCascade {
             name: "Root".to_string(),
             child: ChildSlotNode {
-                id: "PreResolvedId".to_string(),
-                value: "PreResolvedVal".to_string(),
+                id: "PreDryId".to_string(),
+                value: "PreDryVal".to_string(),
             },
         }
     );
@@ -949,7 +949,7 @@ fn test_8_3_qualified_std_derives_and_default_on_formwork_and_dry() {
 /// `extract_doc_comments` and `format_doc_with_details`, as well as direct resolved-mode building.
 #[formwork(builder)]
 #[derive(Clone, Debug, PartialEq)]
-pub struct DocumentedAndResolvedBuilderTarget {
+pub struct DocumentedAndDryBuilderTarget {
     /// Primary identifier for the configuration.
     /// Must be non-empty.
     pub id: String,
@@ -971,12 +971,12 @@ pub struct DocumentedAndResolvedBuilderTarget {
 }
 
 #[test]
-fn test_8_4_documented_fields_and_resolved_mode_builder_ergonomics() {
+fn test_8_4_documented_fields_and_dry_mode_builder_ergonomics() {
     let perk_slice = ["PerkA", "PerkB"];
 
     // Build directly in wet mode using [__V; __N] on pick slot and iterator mutator on collection slot
-    let bp: DocumentedAndResolvedBuilderTargetFormwork =
-        DocumentedAndResolvedBuilderTarget::builder()
+    let bp: DocumentedAndDryBuilderTargetFormwork =
+        DocumentedAndDryBuilderTarget::builder()
             .id("cfg-1")
             .with_static_labels("v1")
             .role("Tank".to_string())
@@ -987,9 +987,9 @@ fn test_8_4_documented_fields_and_resolved_mode_builder_ergonomics() {
     assert!(bp.is_complete());
     let resolved_from_bp = bp.resolve().unwrap();
 
-    // Build directly in Resolved mode (DocumentedAndResolvedBuilderTarget<DocumentedAndResolvedBuilderTargetDry>)
-    let direct_resolved: DocumentedAndResolvedBuilderTarget =
-        DocumentedAndResolvedBuilderTarget::builder()
+    // Build directly in Dry mode (DocumentedAndDryBuilderTarget<DocumentedAndDryBuilderTargetDry>)
+    let direct_resolved: DocumentedAndDryBuilderTarget =
+        DocumentedAndDryBuilderTarget::builder()
             .id("cfg-1")
             .with_static_labels("v1")
             .role("Tank")
@@ -1000,9 +1000,9 @@ fn test_8_4_documented_fields_and_resolved_mode_builder_ergonomics() {
 
     assert_eq!(resolved_from_bp, direct_resolved);
 
-    // Also test [__V; __N] in Resolved mode
-    let direct_resolved_slice: DocumentedAndResolvedBuilderTarget =
-        DocumentedAndResolvedBuilderTarget::builder()
+    // Also test [__V; __N] in Dry mode
+    let direct_resolved_slice: DocumentedAndDryBuilderTarget =
+        DocumentedAndDryBuilderTarget::builder()
             .id("cfg-1")
             .with_static_labels("v1")
             .role("Tank")

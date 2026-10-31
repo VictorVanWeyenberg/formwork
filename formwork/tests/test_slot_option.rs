@@ -90,7 +90,7 @@ fn test_leaf_option_slot_with_choice() {
     let resolved = formwork.resolve().expect("must resolve after choice made");
     assert_eq!(resolved.title, Some("Knight".to_string()));
 
-    // From<Resolved> produces FixedDry slot
+    // From<Dry> produces FixedDry slot
     let back: HeroProfileFormwork = resolved.into();
     assert!(back.is_complete());
     assert!(matches!(back.title, Some(SingleSlot::FixedDry(_))));

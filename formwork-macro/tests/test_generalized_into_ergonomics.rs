@@ -11,7 +11,7 @@ use formwork::{
 
 
 // ============================================================================
-// 1. Primitive Widening in Resolved and Choice Modes
+// 1. Primitive Widening in Dry and Choice Modes
 // ============================================================================
 
 #[formwork(builder)]
@@ -315,7 +315,7 @@ fn test_collection_slots_with_choices_wet_mode() {
 }
 
 // ============================================================================
-// 6. Cascading Pick Slots: Preservation of Pre-Resolved Children
+// 6. Cascading Pick Slots: Preservation of Pre-Dry Children
 // ============================================================================
 
 #[formwork(builder)]
@@ -336,7 +336,7 @@ pub struct CascadeParentHolder {
 
 #[test]
 fn test_cascading_pick_slot_preserves_preresolved_children() {
-    // Build pre-resolved children in Resolved mode
+    // Build pre-dry children in Dry mode
     let child1: CascadeChildItem = CascadeChildItem::builder()
         .code(101u16) // primitive widening
         .desc("Item One") // &str -> String via Into

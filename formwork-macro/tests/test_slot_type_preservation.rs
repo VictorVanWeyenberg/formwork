@@ -37,7 +37,7 @@ fn test_scalar_int_vec_raw_and_resolved() {
     assert_eq!(resolved.tag, "integers");
     assert_eq!(resolved.numbers, vec![1, 2, 3, 4]);
 
-    // 2. Direct Resolved mode builder
+    // 2. Direct Dry mode builder
     let direct_resolved: ScalarIntVecTarget = ScalarIntVecTarget::builder()
         .tag("integers".to_string())
         .numbers(vec![10, 20, 30])
@@ -239,7 +239,7 @@ fn test_scalar_nested_vec_matrix() {
     assert!(bp_raw.is_complete());
     assert_eq!(bp_raw.resolve().unwrap().grid, ones_2x2);
 
-    // Direct Resolved mode builder
+    // Direct Dry mode builder
     let direct: MatrixTarget = MatrixTarget::builder()
         .dim(2usize)
         .grid(vec![vec![9, 9], vec![9, 9]])
