@@ -120,8 +120,8 @@ impl Display for Cardinality {
 /// Internal lifecycle state tracking for a choice.
 ///
 /// Stores staged selections and previous history generically via `H`:
-/// - [`SingleChoice`] instantiates `ChoiceState<usize>` (stack-only scalar, zero heap allocations).
-/// - [`MultiChoice`] instantiates `ChoiceState<Vec<usize>>` (dynamic collection of selected indices).
+/// - [`SingleChoice`] instantiates `ChoiceState<usize>`.
+/// - [`MultiChoice`] instantiates `ChoiceState<Vec<usize>>`.
 #[derive(
     Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
@@ -165,8 +165,6 @@ fn is_default_state<H>(s: &ChoiceState<H>) -> bool {
 }
 
 /// A user-facing choice where exactly one option must be selected and confirmed.
-///
-/// Operates on stack-only `ChoiceState<usize>` with zero heap allocation overhead.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SingleChoice<T> {
     /// The user-facing question or prompt describing this choice.

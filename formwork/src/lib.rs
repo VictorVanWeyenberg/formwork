@@ -17,14 +17,13 @@
 //!    Once completed and validated, application logic (combat engines, invoicing systems, analytics)
 //!    needs a **watertight** struct. No `Option`s, no choice enums, no runtime unwraps.
 //!
-//! ## The Concrete Metaphor
+//! ## Terminology
 //! - **Formwork**: The temporary mold or structural frame holding incomplete data and pending choices.
 //! - **Wet State (`*Wet`, `Slot::FixedWet`, `FormworkError::WetChoice`)**: Data in the fluid, mutable stage where decisions are pending, choices have selection histories, and constraints are evaluated.
 //! - **Dry State (`*Dry`, `Slot::FixedDry`, `Formwork::Dry`)**: The solid, cured, permanent domain model. Watertight, rigid, zero optional wrappers, zero choice state.
 //! - **Resolution**: Consuming the wet formwork to produce the watertight dry domain model via [`.resolve()`](crate::Formwork::resolve) (and [`.resolve_exact()`](crate::choice::SingleChoice::resolve_exact) for scalar choices and single slots).
 //!
-//! Instead of duplicating types (e.g. `CharacterDraft` vs `Character`) and maintaining fragile mapping code,
-//! `formwork` leverages **Higher-Kinded Data (HKD)**:
+//! ## Example
 //!
 //! ```rust
 //! use formwork::formwork;
@@ -51,9 +50,9 @@
 //! - **Normal Field (no `#[slot]`)**: For invariants that are always known upfront (e.g., entity ID, creation timestamp).
 //! - **Slot Field (`#[slot]`)**: For fields whose values may be decided later through choices.
 //!
-//! ## 2x4 Orthogonal Slot Matrix
+//! ## What slot to use
 //!
-//! Slot attributes are configured along two orthogonal dimensions:
+//! Slot attributes are configured along two dimensions:
 //! - **Cardinality / Multiplicity**: Single (scalar value), Option (optional value), Collection (arbitrary items or choices), or Pick (pool of candidates with cardinality constraints).
 //! - **Hierarchy**: Leaf (resolves to concrete data directly) vs. Cascading (`cascade`, recursively resolving child formworks).
 //!

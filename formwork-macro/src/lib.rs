@@ -17,118 +17,48 @@ mod gen_visitor;
 
 /// Transforms a struct into a Higher-Kinded Data (HKD) formwork type.
 ///
-/// `#[formwork]` generates a wet formwork mold alongside a cured, watertight dry domain
-/// model from a single struct definition.
+/// Generates a dual-mode type:
+/// - **Dry domain model (`StructName`)**: The watertight, cured domain struct with concrete field types.
+/// - **Wet formwork (`StructNameFormwork`)**: The mutable mold implementing [`Formwork`],
+///   holding pending choices, defaults, and unconfirmed values in stateful slots.
 ///
-/// # The Formwork Architecture Metaphor
+/// # Macro Attributes
 ///
-/// The architecture follows the concrete casting metaphor:
-/// - **Formwork**: The temporary mold or structural frame holding incomplete data and pending choices.
-/// - **Wet State (`*Wet`, `Slot::FixedWet`, `FormworkError::WetChoice`)**: Data in the fluid, mutable stage where decisions are pending, choices have selection histories, and constraints are evaluated.
-/// - **Dry State (`*Dry`, `Slot::FixedDry`, `Formwork::Dry`)**: The solid, cured, permanent domain model. Watertight, rigid, zero optional wrappers, zero choice state.
-/// - **Resolution**: Consuming the wet formwork to produce the watertight dry domain model via `.resolve()` (and `.resolve_exact()` for scalar choices and single slots).
+/// - `builder`: Generates compile-time checked builders for both wet and dry types.
+/// - `traverse = "bfs" | "dfs"`: Choice traversal strategy for `.walk_choices()` (defaults to `"bfs"`).
+/// - `derives(...)`: Additional derives forwarded to internal mode marker types.
 ///
-/// `#[formwork]` generates a single struct parameterized over a mode `M`:
+/// # Field Attributes
 ///
-/// ```rust,ignore
-/// pub struct Character<M: CharacterMode = CharacterDry> {
-///     // ...
-/// }
-/// ```
+/// Fields without attributes remain fixed in both modes. Slot fields use `#[slot(...)]`:
 ///
-/// - **Dry Domain Model (`Character`)**: Unparameterized, `Character` defaults to dry mode (`CharacterDry`).
-///   All fields contain their watertight, concrete types (`T`, `Vec<T>`). No choices or wet slots exist.
-/// - **Wet Formwork (`CharacterFormwork`)**: A type alias for `Character<CharacterWet>`.
-///   Slot fields wrap values in stateful slots capable of holding pending choices, made choices with history,
-///   or fixed wet values.
-/// - **Resolution**: Wet formworks implement the `Formwork` trait.
-///   Calling `resolve()` verifies that all choices across the entire hierarchy
-///   are satisfied and produces the watertight dry domain model.
+/// - `#[slot]`: Single scalar slot (`T` or `SingleChoice<T>`).
+/// - `#[slot(option)]`: Optional slot (`Option<T>`).
+/// - `#[slot(collection)]`: Ordered list of slot items (`Vec<T>`).
+/// - `#[slot(pick)]`: Multi-item selection slot with cardinality constraints (`Vec<T>`).
+/// - `cascade`: Add to any slot (e.g. `#[slot(cascade)]`, `#[slot(collection, cascade)]`)
+///   to recursively traverse and resolve nested child formworks.
 ///
-/// # Configuration Attributes
-///
-/// Pass options directly into `#[formwork(...)]`:
-///
-/// - `builder`: Generates a fluent, compile-time checked builder powered by `typed-builder`.
-///   Collection slots receive ergonomic `with_<field>` (single item, choice, or slot) and `<field>`
-///   (iterator of items, choices, or slots) mutator methods.
-/// - `traverse = "bfs"` (default) or `"dfs"`: Specifies the tree traversal strategy used when
-///   calling `walk_choices`.
-/// - `derives(...)`: Optionally specifies additional derive macros (e.g. `Clone`, `PartialEq`,
-///   `Serialize`, `Deserialize`) to apply to internal mode marker types. Any `#[derive(...)]`
-///   attributes placed directly on the struct are forwarded automatically.
-///
-/// # Slot Decision Criteria
-///
-/// When designing a formwork struct, consider whether each field should be a slot:
-///
-/// - **Normal Field (no `#[slot]`)**: The value is known unconditionally upfront at construction time.
-///   It cannot be deferred, picked from choices, or altered by visitors (e.g. an ID, a static title, metadata).
-/// - **Slot Field (`#[slot]`)**: The field may involve choices, deferred selection, or hierarchical resolution.
-///
-/// # 2x4 Orthogonal Slot Matrix
-///
-/// Slot attributes are designed along two orthogonal dimensions:
-/// - **Cardinality / Multiplicity**: Single (scalar value), Option (optional value), Collection (arbitrary items or choices), or Pick (pool of candidates with cardinality constraints).
-/// - **Hierarchy**: Leaf (resolves to concrete data directly) vs. Cascading (`cascade`, recursively resolving child formworks).
-///
-/// | Slot Kind | Leaf (Non-Cascading) | Cascading (`cascade`) |
-/// | :--- | :--- | :--- |
-/// | **Single** | `#[slot]` | `#[slot(cascade)]` |
-/// | **Option** | `#[slot(option)]` | `#[slot(option, cascade)]` |
-/// | **Collection** | `#[slot(collection)]` | `#[slot(collection, cascade)]` |
-/// | **Pick** | `#[slot(pick)]` | `#[slot(pick, cascade)]` |
-///
-/// # Slot Kinds Reference
-///
-/// | Slot Attribute | Field Type | Wet Formwork Slot Type | Resolves To | Description |
-/// | :--- | :--- | :--- | :--- | :--- |
-/// | `#[slot]` | `T` | `SingleSlot<T, T>` | `T` | Single slot for a non-formwork type. Accepts `T` or `SingleChoice<T>`. |
-/// | `#[slot(option)]` | `Option<T>` | `Option<SingleSlot<T, T>>` | `Option<T>` | Optional slot for non-formwork items. Accepts individual items, `SingleChoice<T>`, or `SingleSlot`. |
-/// | `#[slot(collection)]` | `Vec<T>` | `Vec<SingleSlot<T, T>>` | `Vec<T>` | Collection slot for non-formwork items. Accepts individual items, `SingleChoice<T>`, or `SingleSlot`. |
-/// | `#[slot(pick)]` | `Vec<T>` | `MultiSlot<T, T>` | `Vec<T>` | Pick slot for selecting multiple items from candidates according to cardinality. Accepts `MultiChoice<T>` or `MultiSlot`. |
-/// | `#[slot(cascade)]` | `Child` | `SingleSlot<ChildFormwork, Child>` | `Child` | Cascading single slot for a nested formwork type. Resolves the child when the parent resolves. |
-/// | `#[slot(option, cascade)]` | `Option<Child>` | `Option<SingleSlot<ChildFormwork, Child>>` | `Option<Child>` | Cascading optional slot for nested formwork types. Resolves the child when present. |
-/// | `#[slot(collection, cascade)]` | `Vec<Child>` | `Vec<SingleSlot<ChildFormwork, Child>>` | `Vec<Child>` | Cascading collection slot for nested formwork types. Recursively resolves all children. |
-/// | `#[slot(pick, cascade)]` | `Vec<Child>` | `MultiSlot<ChildFormwork, Child>` | `Vec<Child>` | Cascading pick slot selecting child formworks subject to cardinality. |
-///
-/// # End-to-End Walkthrough Example
+/// # Example
 ///
 /// ```rust
 /// use formwork::{formwork, Formwork, choice::SingleChoice};
 ///
 /// #[formwork(builder)]
-/// #[derive(Clone, Debug, PartialEq)]
-/// pub struct HeroClass {
+/// pub struct Character {
 ///     pub name: String,
 ///     #[slot]
-///     pub primary_weapon: String,
-///     #[slot(collection)]
-///     pub proficiencies: Vec<String>,
+///     pub class: String,
 /// }
 ///
-/// // 1. Construct a wet formwork with choices
-/// let mut wet_hero: HeroClassFormwork = HeroClass::builder()
-///     .name("Fighter")
-///     .primary_weapon(SingleChoice::new("Choose martial weapon", vec![
-///         "Longsword".to_string(),
-///         "Battleaxe".to_string(),
-///     ]))
-///     .with_proficiencies("Shields".to_string())
+/// let mut formwork = Character::builder()
+///     .name("Conan")
+///     .class(SingleChoice::new("Pick Class", vec!["Barbarian".to_string(), "Fighter".to_string()]))
 ///     .build();
 ///
-/// // 2. Formwork is incomplete because a choice is pending
-/// assert!(!wet_hero.is_complete());
-///
-/// // 3. Satisfy choices across the hierarchy using a visitor
-/// wet_hero.walk_choices(&mut formwork::visitor::AutoSelectFirst);
-/// assert!(wet_hero.is_complete());
-///
-/// // 4. Resolve into the watertight dry domain model
-/// let dry_hero: HeroClass = wet_hero.resolve().unwrap();
-/// assert_eq!(dry_hero.name, "Fighter");
-/// assert_eq!(dry_hero.primary_weapon, "Longsword");
-/// assert_eq!(dry_hero.proficiencies, vec!["Shields".to_string()]);
+/// formwork.walk_choices(&mut formwork::visitor::AutoSelectFirst);
+/// let hero: Character = formwork.resolve().unwrap();
+/// assert_eq!(hero.class, "Barbarian");
 /// ```
 #[proc_macro_attribute]
 pub fn formwork(attr: TokenStream, item: TokenStream) -> TokenStream {

@@ -59,8 +59,4 @@ pub enum FormworkError {
         /// The unselected index.
         index: usize,
     },
-
-    /// A custom or application-specific formwork error.
-    #[error("{0}")]
-    Custom(String),
 }
