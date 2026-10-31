@@ -1,5 +1,0 @@
-error: Unknown value: `diagonal`. Available values: `bfs`, `dfs`
- --> tests/ui/03_invalid_traversal.rs:3:24
-  |
-3 | #[schematic(traverse = "diagonal")]
-  |                        ^^^^^^^^^^

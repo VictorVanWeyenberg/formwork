@@ -1,5 +1,0 @@
-error: `#[slot(collection)]` requires a `Vec<T>` field type
-  --> tests/ui/10_collection_cascade_non_vec.rs:13:16
-   |
-13 |     pub child: Child,
-   |                ^^^^^

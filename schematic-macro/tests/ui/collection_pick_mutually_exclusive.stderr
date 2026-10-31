@@ -1,5 +1,0 @@
-error: `collection` and `pick` cannot be used together in #[slot]
- --> tests/ui/collection_pick_mutually_exclusive.rs:6:5
-  |
-6 |     bad_field: Vec<String>,
-  |     ^^^^^^^^^

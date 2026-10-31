@@ -1,5 +1,0 @@
-error: `#[slot(collection)]` requires a `Vec<T>` field type
- --> tests/ui/05_collection_non_vec.rs:6:15
-  |
-6 |     pub item: i32,
-  |               ^^^

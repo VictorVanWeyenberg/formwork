@@ -1,5 +1,0 @@
-error: `#[slot(pick)]` requires a `Vec<T>` field type
- --> tests/ui/06_pick_non_vec.rs:6:15
-  |
-6 |     pub item: String,
-  |               ^^^^^^

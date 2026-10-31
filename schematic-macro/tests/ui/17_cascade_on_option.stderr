@@ -1,5 +1,0 @@
-error: `#[slot(cascade)]` cannot be used on `Option<T>`; did you mean `#[slot(option, cascade)]`?
- --> tests/ui/17_cascade_on_option.rs:6:16
-  |
-6 |     bad_field: Option<String>,
-  |                ^^^^^^

@@ -1,5 +1,0 @@
-error: `#[slot(pick)]` requires a `Vec<T>` field type
-  --> tests/ui/11_pick_cascade_non_vec.rs:13:16
-   |
-13 |     pub child: Child,
-   |                ^^^^^

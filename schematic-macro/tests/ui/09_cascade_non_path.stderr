@@ -1,5 +1,0 @@
-error: `#[slot(cascade)]` requires a type path that can support HKD mode types
-  --> tests/ui/09_cascade_non_path.rs:13:15
-   |
-13 |     pub pair: (Child, Child),
-   |               ^^^^^^^^^^^^^^
