@@ -8,6 +8,7 @@ pub fn generate_modes(ast: &FormworkStruct, args: &FormworkArgs) -> TokenStream 
     let mode_trait = format_ident!("{}Mode", name);
     let wet_struct = format_ident!("{}Wet", name);
     let dry_struct = format_ident!("{}Dry", name);
+    let formwork_type = format_ident!("{}Formwork", name);
 
     let mut mode_types = Vec::new();
     let mut wet_fields = Vec::new();
@@ -32,7 +33,30 @@ pub fn generate_modes(ast: &FormworkStruct, args: &FormworkArgs) -> TokenStream 
                     quote! {}
                 };
 
-                mode_types.push(quote! { type #mode_type_name #bounds_tokens; });
+                let slot_kind_desc = if config.pick {
+                    "multi-item selection slot with cardinality constraints"
+                } else if config.collection {
+                    "ordered collection of slot items"
+                } else if config.option {
+                    "optional slot item"
+                } else {
+                    "single slot item"
+                };
+
+                let assoc_doc = format!(
+                    "Representation type for the `{field_name}` slot field in mode `Self` ({slot_kind_desc}).\n\n\
+                     - In wet mode ([`{wet_struct}`]): holds reactive choice-bearing slot storage.\n\
+                     - In dry mode ([`{dry_struct}`]): holds the cured, watertight domain type.",
+                    field_name = field_name,
+                    slot_kind_desc = slot_kind_desc,
+                    wet_struct = wet_struct,
+                    dry_struct = dry_struct,
+                );
+
+                mode_types.push(quote! {
+                    #[doc = #assoc_doc]
+                    type #mode_type_name #bounds_tokens;
+                });
 
                 let wet_inner_type = field.wet_inner_type(&config);
                 let dry_inner_type = field.dry_inner_type(&config);
@@ -64,11 +88,51 @@ pub fn generate_modes(ast: &FormworkStruct, args: &FormworkArgs) -> TokenStream 
         quote! { #[derive(#(#paths),*)] }
     };
 
-    let wet_doc = format!("Wet mode marker for [`{}`].", name);
-    let dry_doc = format!("Dry mode marker for [`{}`].", name);
+    let mode_trait_doc = format!(
+        "Mode marker trait defining the Higher-Kinded Data (HKD) slot representations for [`{name}`].\n\n\
+         This trait governs how slot fields are represented between the fluid wet formwork mold \
+         ([`{wet_struct}`] / [`{formwork_type}`]) and the cured watertight domain model \
+         ([`{dry_struct}`] / [`{name}`]).",
+        name = name,
+        wet_struct = wet_struct,
+        dry_struct = dry_struct,
+        formwork_type = formwork_type,
+    );
+
+    let wet_doc = format!(
+        "Wet mode marker for [`{name}`].\n\n\
+         Configures [`{name}<{wet_struct}>`] (aliased as [`{formwork_type}`]) where slot fields \
+         are wrapped in reactive formwork choice slots.\n\n\
+         Implements [`{mode_trait}`].",
+        name = name,
+        wet_struct = wet_struct,
+        formwork_type = formwork_type,
+        mode_trait = mode_trait,
+    );
+
+    let dry_doc = format!(
+        "Dry mode marker for [`{name}`].\n\n\
+         Configures [`{name}<{dry_struct}>`] (aliased as [`{name}`]) where slot fields \
+         hold resolved concrete domain values.\n\n\
+         Implements [`{mode_trait}`].",
+        name = name,
+        dry_struct = dry_struct,
+        mode_trait = mode_trait,
+    );
+
+    let wet_impl_doc = format!(
+        "Configures slot fields of [`{name}`] as reactive, choice-bearing wet slots ([`{formwork_type}`]).",
+        name = name,
+        formwork_type = formwork_type,
+    );
+
+    let dry_impl_doc = format!(
+        "Configures slot fields of [`{name}`] as cured, watertight domain types.",
+        name = name,
+    );
 
     quote! {
-        #[doc(hidden)]
+        #[doc = #mode_trait_doc]
         pub trait #mode_trait {
             #(#mode_types)*
         }
@@ -81,12 +145,12 @@ pub fn generate_modes(ast: &FormworkStruct, args: &FormworkArgs) -> TokenStream 
         #derives
         pub struct #dry_struct;
 
-        #[doc(hidden)]
+        #[doc = #wet_impl_doc]
         impl #mode_trait for #wet_struct {
             #(#wet_fields)*
         }
 
-        #[doc(hidden)]
+        #[doc = #dry_impl_doc]
         impl #mode_trait for #dry_struct {
             #(#dry_fields)*
         }
