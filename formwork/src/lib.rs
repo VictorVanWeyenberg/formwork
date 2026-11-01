@@ -126,5 +126,7 @@ extern crate self as formwork;
 pub use formwork_core::*;
 pub use formwork_macro::*;
 pub use typed_builder;
+/// Derive macro for compile-time checked builders, re-exported from [`typed_builder`].
+pub use typed_builder::TypedBuilder;
 
 pub mod tutorial;

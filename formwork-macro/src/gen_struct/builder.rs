@@ -33,13 +33,15 @@ pub(crate) fn generate_builder_derives(
 
     if mutators.is_empty() {
         quote! {
-            #[derive(typed_builder::TypedBuilder)]
+            #[derive(::formwork::typed_builder::TypedBuilder)]
+            #[builder(crate_module_path = ::formwork::typed_builder)]
             #[builder(doc)]
         }
     } else {
         quote! {
-            #[formwork::__qualify_mode(#mode_trait)]
-            #[derive(typed_builder::TypedBuilder)]
+            #[::formwork::__qualify_mode(#mode_trait)]
+            #[derive(::formwork::typed_builder::TypedBuilder)]
+            #[builder(crate_module_path = ::formwork::typed_builder)]
             #[builder(doc)]
             #[builder(mutators(
                 #(#mutators)*
