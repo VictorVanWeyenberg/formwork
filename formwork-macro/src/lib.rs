@@ -19,7 +19,7 @@ mod gen_visitor;
 ///
 /// Generates a dual-mode type:
 /// - **Dry domain model (`StructName`)**: The watertight, cured domain struct with concrete field types.
-/// - **Wet formwork (`StructNameFormwork`)**: The mutable mold implementing [`Formwork`],
+/// - **Wet formwork (`StructNameFormwork`)**: The mutable mold implementing `Formwork`,
 ///   holding pending choices, defaults, and unconfirmed values in stateful slots.
 ///
 /// # Macro Attributes
