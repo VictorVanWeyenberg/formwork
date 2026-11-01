@@ -114,6 +114,17 @@
 //! assert_eq!(hero.primary_weapon, "Longsword");
 //! assert_eq!(hero.proficiencies, vec!["Shields".to_string()]);
 //! ```
+//!
+//! # Interactive Tutorial: The Chronicle of the Realm-Crafter
+//!
+//! To explore hands-on, progressive guides through every slot kind and traversal strategy,
+//! visit the [`tutorial`] module. Follow along the 10 chapters to master constructing,
+//! inspecting, stepping, and curing fluid formworks into solid domain models.
+
+extern crate self as formwork;
 
 pub use formwork_core::*;
 pub use formwork_macro::*;
+pub use typed_builder;
+
+pub mod tutorial;
