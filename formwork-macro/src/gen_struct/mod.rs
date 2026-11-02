@@ -97,8 +97,47 @@ fn generate_slot_field(
     };
 
     let mode_type_name = &ctx.mode_type_name;
-    let ty = quote! { M::#mode_type_name };
-    let field_tokens = format_field(&ctx.field_attrs, &builder_attr, ctx.vis, ctx.field_name, &ty);
+    let (ty, serde_bound_attr) = if config.option {
+        let has_serialize = args.derives.iter().any(|p| {
+            p.segments.last().is_some_and(|s| s.ident == "Serialize")
+        });
+        let has_deserialize = args.derives.iter().any(|p| {
+            p.segments.last().is_some_and(|s| s.ident == "Deserialize")
+        });
+        let user_has_serde_bound = ctx.field_attrs.iter().any(|attr| {
+            if attr.path().is_ident("serde") {
+                quote!(#attr).to_string().contains("bound")
+            } else {
+                false
+            }
+        });
+
+        let bound_attr = if !user_has_serde_bound {
+            match (has_serialize, has_deserialize) {
+                (true, true) => {
+                    let ser_bound = format!("M::{}: ::formwork::serde::Serialize", mode_type_name);
+                    let de_bound = format!("M::{}: ::formwork::serde::Deserialize<'de>", mode_type_name);
+                    quote! { #[serde(bound(serialize = #ser_bound, deserialize = #de_bound))] }
+                }
+                (true, false) => {
+                    let ser_bound = format!("M::{}: ::formwork::serde::Serialize", mode_type_name);
+                    quote! { #[serde(bound(serialize = #ser_bound))] }
+                }
+                (false, true) => {
+                    let de_bound = format!("M::{}: ::formwork::serde::Deserialize<'de>", mode_type_name);
+                    quote! { #[serde(bound(deserialize = #de_bound))] }
+                }
+                (false, false) => quote! {},
+            }
+        } else {
+            quote! {}
+        };
+
+        (quote! { Option<M::#mode_type_name> }, bound_attr)
+    } else {
+        (quote! { M::#mode_type_name }, quote! {})
+    };
+    let field_tokens = format_field(&ctx.field_attrs, &builder_attr, &serde_bound_attr, ctx.vis, ctx.field_name, &ty);
 
     GeneratedField {
         field_tokens,

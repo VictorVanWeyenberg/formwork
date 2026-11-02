@@ -139,6 +139,21 @@ pub fn __qualify_mode(attr: TokenStream, item: TokenStream) -> TokenStream {
             {
                 let assoc = &type_path.path.segments[1].ident;
                 field.ty = syn::parse_quote!(<M as #mode_trait>::#assoc);
+            } else if let syn::Type::Path(ref type_path) = field.ty
+                && type_path.qself.is_none()
+                && type_path.path.segments.len() == 1
+                && type_path.path.segments[0].ident == "Option"
+                && let syn::PathArguments::AngleBracketed(ref args) =
+                    type_path.path.segments[0].arguments
+                && args.args.len() == 1
+                && let syn::GenericArgument::Type(syn::Type::Path(inner_path)) =
+                    &args.args[0]
+                && inner_path.qself.is_none()
+                && inner_path.path.segments.len() == 2
+                && inner_path.path.segments[0].ident == "M"
+            {
+                let assoc = &inner_path.path.segments[1].ident;
+                field.ty = syn::parse_quote!(Option<<M as #mode_trait>::#assoc>);
             }
         }
     }

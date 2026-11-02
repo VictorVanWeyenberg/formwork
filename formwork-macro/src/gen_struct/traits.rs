@@ -31,6 +31,13 @@ fn generate_slot_trait_def(ctx: &SlotFieldContext) -> TokenStream {
                 fn into_slot(self) -> <M::#mode_type_name as std::iter::IntoIterator>::Item;
             }
         }
+    } else if ctx.config.option {
+        quote! {
+            #[doc(hidden)]
+            pub trait #trait_name<M: #mode_trait> {
+                fn into_slot(self) -> Option<M::#mode_type_name>;
+            }
+        }
     } else {
         quote! {
             #[doc(hidden)]

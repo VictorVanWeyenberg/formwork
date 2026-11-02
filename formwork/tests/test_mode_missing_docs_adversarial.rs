@@ -179,8 +179,8 @@ fn test_mode_trait_and_associated_types_accessibility() {
     type DryOption = <AllSlotKindsEntityDry as AllSlotKindsEntityMode>::OptionLeaf;
     fn check_option_wet(_: WetOption) {}
     fn check_option_dry(_: DryOption) {}
-    check_option_wet(Some(formwork::SingleSlot::FixedWet("opt".to_string())));
-    check_option_dry(Some("opt".to_string()));
+    check_option_wet(formwork::SingleSlot::FixedWet("opt".to_string()));
+    check_option_dry("opt".to_string());
 
     // Collection Leaf:
     type WetCollection = <AllSlotKindsEntityWet as AllSlotKindsEntityMode>::CollectionLeaf;

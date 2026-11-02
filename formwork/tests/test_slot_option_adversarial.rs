@@ -228,6 +228,42 @@ pub struct SerdeParent {
     pub opt_child: Option<SerdeChild>,
 }
 
+#[formwork(
+    builder,
+    derives(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)
+)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SerdeSkipIfNoneEntity {
+    pub name: String,
+    #[slot(option)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opt_text: Option<String>,
+    #[slot(option, cascade)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opt_child: Option<SerdeChild>,
+}
+
+#[test]
+fn test_serde_skip_serializing_if_none() {
+    let wet = SerdeSkipIfNoneEntityFormwork::builder()
+        .name("Entity".to_string())
+        .build();
+
+    let wet_json = serde_json::to_string(&wet).expect("must serialize wet");
+    assert!(!wet_json.contains("opt_text"), "opt_text must be skipped in JSON");
+    assert!(!wet_json.contains("opt_child"), "opt_child must be skipped in JSON");
+
+    let dry: SerdeSkipIfNoneEntity = wet.resolve().expect("must resolve");
+    let dry_json = serde_json::to_string(&dry).expect("must serialize dry");
+    assert!(!dry_json.contains("opt_text"), "opt_text must be skipped in dry JSON");
+    assert!(!dry_json.contains("opt_child"), "opt_child must be skipped in dry JSON");
+    assert_eq!(dry_json, r#"{"name":"Entity"}"#);
+
+    let dry_deserialized: SerdeSkipIfNoneEntity =
+        serde_json::from_str(&dry_json).expect("must deserialize from sparse JSON");
+    assert_eq!(dry, dry_deserialized);
+}
+
 #[test]
 fn test_serde_json_roundtrip_none_slots() {
     let formwork = SerdeParentFormwork::builder()

@@ -73,3 +73,6 @@ pub use error::FormworkError;
 pub use formwork_trait::{Formwork, FormworkSession, Level, StepOutcome, StepResult, Walkable};
 pub use slot::{MultiSlot, SingleSlot, Slot};
 pub use visitor::{AutoSelectFirst, ChoiceVisitor, ConfirmAll, UnmakeAll, VisitorFlow};
+
+/// Re-exported serde for downstream derive macros and bounds.
+pub use serde;

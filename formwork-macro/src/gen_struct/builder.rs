@@ -11,12 +11,14 @@ use syn::Ident;
 pub(crate) fn format_field(
     attrs: &[&syn::Attribute],
     builder_attr: &TokenStream,
+    serde_bound_attr: &TokenStream,
     vis: &syn::Visibility,
     ident: &Ident,
     ty: &TokenStream,
 ) -> TokenStream {
     quote! {
         #(#attrs)*
+        #serde_bound_attr
         #builder_attr
         #vis #ident: #ty,
     }
@@ -181,7 +183,8 @@ pub(crate) fn generate_regular_field(
     };
 
     let ty_tokens = quote! { #ty };
-    let field_tokens = format_field(&field_attrs, &builder_attr, vis, field_name, &ty_tokens);
+    let empty_bound = quote! {};
+    let field_tokens = format_field(&field_attrs, &builder_attr, &empty_bound, vis, field_name, &ty_tokens);
 
     GeneratedField {
         field_tokens,

@@ -128,5 +128,7 @@ pub use formwork_macro::*;
 pub use typed_builder;
 /// Derive macro for compile-time checked builders, re-exported from [`typed_builder`].
 pub use typed_builder::TypedBuilder;
+/// Re-exported serde for downstream serialization bounds and derives.
+pub use formwork_core::serde;
 
 pub mod tutorial;

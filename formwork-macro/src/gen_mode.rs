@@ -27,8 +27,6 @@ pub fn generate_modes(ast: &FormworkStruct, args: &FormworkArgs) -> TokenStream 
                             + std::iter::IntoIterator
                             + Extend<<Self::#mode_type_name as std::iter::IntoIterator>::Item>
                     }
-                } else if config.option {
-                    quote! { : Default }
                 } else {
                     quote! {}
                 };
@@ -70,9 +68,9 @@ pub fn generate_modes(ast: &FormworkStruct, args: &FormworkArgs) -> TokenStream 
                     dry_fields
                         .push(quote! { type #mode_type_name = Vec<#dry_inner_type>; });
                 } else if config.option {
-                    wet_fields.push(quote! { type #mode_type_name = Option<formwork::SingleSlot<#wet_inner_type, #dry_inner_type>>; });
+                    wet_fields.push(quote! { type #mode_type_name = formwork::SingleSlot<#wet_inner_type, #dry_inner_type>; });
                     dry_fields
-                        .push(quote! { type #mode_type_name = Option<#dry_inner_type>; });
+                        .push(quote! { type #mode_type_name = #dry_inner_type; });
                 } else {
                     wet_fields.push(quote! { type #mode_type_name = formwork::SingleSlot<#wet_inner_type, #dry_inner_type>; });
                     dry_fields.push(quote! { type #mode_type_name = #dry_inner_type; });
