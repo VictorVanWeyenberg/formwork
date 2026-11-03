@@ -1,0 +1,5 @@
+error: `freeform` and `pick` cannot be used together in #[slot]
+ --> tests/compile_fail/freeform_pick.rs:6:9
+  |
+6 |     pub field: Vec<String>,
+  |         ^^^^^

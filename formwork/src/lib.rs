@@ -62,6 +62,9 @@
 //! | **Option** | `#[slot(option)]` | `#[slot(option, cascade)]` |
 //! | **Collection** | `#[slot(collection)]` | `#[slot(collection, cascade)]` |
 //! | **Pick** | `#[slot(pick)]` | `#[slot(pick, cascade)]` |
+//! | **Freeform** | `#[slot(freeform)]` | *(Forbidden: construct child formworks directly)* |
+//! | **Freeform Option** | `#[slot(freeform, option)]` | *(Forbidden)* |
+//! | **Freeform Collection** | `#[slot(freeform, collection)]` | *(Forbidden)* |
 //!
 //! ## Slot Kinds Reference
 //!
@@ -71,6 +74,9 @@
 //! | `#[slot(option)]` | `Option<T>` | `Option<SingleSlot<T, T>>` | `Option<T>` | Optional item or [`SingleChoice<T>`](crate::choice::SingleChoice). |
 //! | `#[slot(collection)]` | `Vec<T>` | `Vec<SingleSlot<T, T>>` | `Vec<T>` | Ordered collection of individual items or [`SingleChoice<T>`](crate::choice::SingleChoice). |
 //! | `#[slot(pick)]` | `Vec<T>` | `MultiSlot<T, T>` | `Vec<T>` | Multi-selection pick slot choosing items via [`MultiChoice<T>`](crate::choice::MultiChoice). |
+//! | `#[slot(freeform)]` | `T` | `FreeformSlot<T, T>` | `T` | Single freeform item or [`Freeform<T>`](crate::choice::Freeform). |
+//! | `#[slot(freeform, option)]` | `Option<T>` | `Option<FreeformSlot<T, T>>` | `Option<T>` | Optional freeform item or [`Freeform<T>`](crate::choice::Freeform). |
+//! | `#[slot(freeform, collection)]` | `Vec<T>` | `Vec<FreeformSlot<T, T>>` | `Vec<T>` | Ordered collection of freeform items or [`Freeform<T>`](crate::choice::Freeform). |
 //! | `#[slot(cascade)]` | `Child` | `SingleSlot<ChildFormwork, Child>` | `Child` | Cascading child formwork; resolving parent automatically resolves child. |
 //! | `#[slot(option, cascade)]` | `Option<Child>` | `Option<SingleSlot<ChildFormwork, Child>>` | `Option<Child>` | Cascading optional child formwork. |
 //! | `#[slot(collection, cascade)]` | `Vec<Child>` | `Vec<SingleSlot<ChildFormwork, Child>>` | `Vec<Child>` | Cascading collection of child formworks. |

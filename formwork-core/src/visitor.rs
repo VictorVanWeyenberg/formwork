@@ -1,4 +1,4 @@
-use crate::choice::{Cardinality, MultiChoice, SingleChoice};
+use crate::choice::{Cardinality, Freeform, MultiChoice, SingleChoice};
 #[cfg(doc)]
 use crate::formwork_trait::Formwork;
 
@@ -62,6 +62,13 @@ pub trait ChoiceVisitor<T> {
 
     /// Invoked for each [`MultiChoice`] encountered during traversal.
     fn visit_multi(&mut self, choice: &mut MultiChoice<T>) -> VisitorFlow;
+
+    /// Invoked for each [`Freeform`] choice encountered during traversal.
+    ///
+    /// Default implementation returns [`VisitorFlow::Continue`].
+    fn visit_freeform(&mut self, _choice: &mut Freeform<T>) -> VisitorFlow {
+        VisitorFlow::Continue
+    }
 }
 
 impl<T, V: ChoiceVisitor<T> + ?Sized> ChoiceVisitor<T> for &mut V {
@@ -71,6 +78,10 @@ impl<T, V: ChoiceVisitor<T> + ?Sized> ChoiceVisitor<T> for &mut V {
 
     fn visit_multi(&mut self, choice: &mut MultiChoice<T>) -> VisitorFlow {
         (**self).visit_multi(choice)
+    }
+
+    fn visit_freeform(&mut self, choice: &mut Freeform<T>) -> VisitorFlow {
+        (**self).visit_freeform(choice)
     }
 }
 
@@ -95,6 +106,13 @@ impl<T> ChoiceVisitor<T> for UnmakeAll {
         }
         VisitorFlow::Continue
     }
+
+    fn visit_freeform(&mut self, choice: &mut Freeform<T>) -> VisitorFlow {
+        if choice.is_made() {
+            let _ = choice.unmake();
+        }
+        VisitorFlow::Continue
+    }
 }
 
 /// Built-in visitor that re-confirms all unmade choices having an existing selection history.
@@ -111,6 +129,11 @@ impl<T> ChoiceVisitor<T> for ConfirmAll {
     }
 
     fn visit_multi(&mut self, choice: &mut MultiChoice<T>) -> VisitorFlow {
+        let _ = choice.confirm();
+        VisitorFlow::Continue
+    }
+
+    fn visit_freeform(&mut self, choice: &mut Freeform<T>) -> VisitorFlow {
         let _ = choice.confirm();
         VisitorFlow::Continue
     }
@@ -143,6 +166,13 @@ impl<T> ChoiceVisitor<T> for AutoSelectFirst {
             for i in 0..target_count.min(choice.options().len()) {
                 let _ = choice.select(i);
             }
+            let _ = choice.confirm();
+        }
+        VisitorFlow::Continue
+    }
+
+    fn visit_freeform(&mut self, choice: &mut Freeform<T>) -> VisitorFlow {
+        if !choice.is_made() && choice.value().is_some() {
             let _ = choice.confirm();
         }
         VisitorFlow::Continue

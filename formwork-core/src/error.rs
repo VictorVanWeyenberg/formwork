@@ -59,4 +59,11 @@ pub enum FormworkError {
         /// The unselected index.
         index: usize,
     },
+
+    /// Attempted to confirm a freeform choice while it was in a pending state without a value.
+    #[error("`{prompt}`: freeform choice requires a value before confirmation")]
+    MissingFreeformValue {
+        /// The prompt associated with the freeform choice.
+        prompt: String,
+    },
 }

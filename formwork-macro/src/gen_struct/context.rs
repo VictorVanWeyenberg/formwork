@@ -55,13 +55,17 @@ impl<'a> SlotFieldContext<'a> {
         let wet_inner_type = field.wet_inner_type(config);
         let dry_inner_type = field.dry_inner_type(config);
 
-        let slot_type = if config.pick {
+        let slot_type = if config.freeform {
+            quote! { formwork::FreeformSlot<#wet_inner_type, #dry_inner_type> }
+        } else if config.pick {
             quote! { formwork::MultiSlot<#wet_inner_type, #dry_inner_type> }
         } else {
             quote! { formwork::SingleSlot<#wet_inner_type, #dry_inner_type> }
         };
 
-        let choice_type = if config.pick {
+        let choice_type = if config.freeform {
+            quote! { formwork::choice::Freeform<#wet_inner_type> }
+        } else if config.pick {
             quote! { formwork::choice::MultiChoice<#wet_inner_type> }
         } else {
             quote! { formwork::choice::SingleChoice<#wet_inner_type> }

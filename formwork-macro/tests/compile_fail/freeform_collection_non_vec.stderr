@@ -1,0 +1,5 @@
+error: `#[slot(collection)]` requires a `Vec<T>` field type
+ --> tests/compile_fail/freeform_collection_non_vec.rs:6:16
+  |
+6 |     pub field: String,
+  |                ^^^^^^

@@ -24,6 +24,7 @@
 //! | :--- | :--- |
 //! | [`SingleChoice`] | A choice where exactly one option must be selected from a list of candidates. |
 //! | [`MultiChoice`] | A choice where multiple options are selected according to a [`Cardinality`] constraint. |
+//! | [`Freeform`] | A choice where arbitrary user values can be constructed or staged as defaults. |
 //! | [`Cardinality`] | Specifies selection limits on multi-choices (`Exact(n)`, `UpTo(n)`, `AtLeast(n)`). |
 //! | [`Formwork`] | The primary trait implemented by wet formworks (`<Name>Formwork`), providing completeness checks, resolution into watertight dry models, and tree traversal. |
 //! | [`ChoiceVisitor`] | Trait for implementing custom choice traversal logic across a formwork tree. |
@@ -43,7 +44,7 @@
 //!
 //! | Type | Role |
 //! | :--- | :--- |
-//! | [`Slot`], [`SingleSlot`], [`MultiSlot`] | Generic enums and type aliases storing slot data across wet and dry modes. |
+//! | [`Slot`], [`SingleSlot`], [`MultiSlot`], [`FreeformSlot`] | Generic enums and type aliases storing slot data across wet and dry modes. |
 //! | [`ChoiceState`] | Low-level state enum tracking index selections and unmade history. |
 //! | [`Walkable`], [`Level`] | Recursive traversal mechanics for breadth-first visitor execution. |
 //!
@@ -51,11 +52,11 @@
 //! > **Internal Plumbing Types**
 //! >
 //! > If your application code or end users ever interact directly with [`Slot`], [`SingleSlot`],
-//! > [`MultiSlot`], [`ChoiceState`], or [`Walkable`], **something is wrong in the API usage**.
+//! > [`MultiSlot`], [`FreeformSlot`], [`ChoiceState`], or [`Walkable`], **something is wrong in the API usage**.
 //! >
 //! > The macro-generated builder and conversion traits automatically wrap raw values and choices
 //! > into the appropriate internal slot structures. Always interact through generated builders,
-//! > user-facing choices ([`SingleChoice`], [`MultiChoice`]), and the [`Formwork`] trait.
+//! > user-facing choices ([`SingleChoice`], [`MultiChoice`], [`Freeform`]), and the [`Formwork`] trait.
 
 /// Choice abstractions, state machines, and cardinality constraints.
 pub mod choice;
@@ -68,10 +69,10 @@ pub mod slot;
 /// Visitor pattern implementation for inspecting and manipulating choices.
 pub mod visitor;
 
-pub use choice::{Cardinality, ChoiceState, MultiChoice, SingleChoice};
+pub use choice::{Cardinality, ChoiceState, Freeform, MultiChoice, SingleChoice};
 pub use error::FormworkError;
 pub use formwork_trait::{Formwork, FormworkSession, Level, StepOutcome, StepResult, Walkable};
-pub use slot::{MultiSlot, SingleSlot, Slot};
+pub use slot::{FreeformSlot, MultiSlot, SingleSlot, Slot};
 pub use visitor::{AutoSelectFirst, ChoiceVisitor, ConfirmAll, UnmakeAll, VisitorFlow};
 
 /// Re-exported serde for downstream derive macros and bounds.

@@ -6,7 +6,7 @@
 //! Use macro-generated builders, [`SingleChoice`],
 //! [`MultiChoice`], and the [`Formwork`] trait instead.
 
-use crate::choice::{MultiChoice, SingleChoice};
+use crate::choice::{Freeform, MultiChoice, SingleChoice};
 use crate::error::FormworkError;
 #[cfg(doc)]
 use crate::formwork_trait::Formwork;
@@ -33,6 +33,9 @@ pub type SingleSlot<W, D> = Slot<W, D, SingleChoice<W>>;
 ///
 /// Holds either a [`MultiChoice<W>`] choice or a fixed collection (`Vec<W>` / `Vec<D>`).
 pub type MultiSlot<W, D> = Slot<Vec<W>, Vec<D>, MultiChoice<W>>;
+
+/// Internal plumbing: slot specialization for [`Freeform`].
+pub type FreeformSlot<W, D> = Slot<W, D, Freeform<W>>;
 
 impl<W, D, C> Slot<W, D, C> {
     /// Returns a reference to the inner choice if this slot is a [`Slot::Choose`].
@@ -88,6 +91,18 @@ impl<W, D> From<W> for SingleSlot<W, D> {
 
 impl<W, D> From<Vec<W>> for MultiSlot<W, D> {
     fn from(value: Vec<W>) -> Self {
+        Slot::FixedWet(value)
+    }
+}
+
+impl<W, D> From<Freeform<W>> for FreeformSlot<W, D> {
+    fn from(choice: Freeform<W>) -> Self {
+        Slot::Choose(choice)
+    }
+}
+
+impl<W, D> From<W> for FreeformSlot<W, D> {
+    fn from(value: W) -> Self {
         Slot::FixedWet(value)
     }
 }
@@ -175,5 +190,53 @@ impl<T> MultiSlot<T, T> {
             Slot::FixedDry(d) => Ok(d),
             Slot::Choose(c) => c.resolve(),
         }
+    }
+}
+
+impl<W, D> FreeformSlot<W, D> {
+    /// Returns `true` if this slot contains an unconfirmed choice.
+    pub fn is_pending(&self) -> bool {
+        match self {
+            Slot::Choose(c) => !c.is_made(),
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if this slot contains a confirmed choice.
+    pub fn is_made(&self) -> bool {
+        match self {
+            Slot::Choose(c) => c.is_made(),
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if this slot is complete (fixed value or confirmed choice).
+    pub fn is_complete(&self) -> bool {
+        match self {
+            Slot::FixedWet(_) | Slot::FixedDry(_) => true,
+            Slot::Choose(c) => c.is_made(),
+        }
+    }
+}
+
+impl<T> FreeformSlot<T, T> {
+    /// Resolves the freeform slot into its concrete value.
+    ///
+    /// For non-cascading slots where $W = D$, pre-resolved values stored in
+    /// [`Slot::FixedDry`] are returned directly as `Ok(val)`.
+    ///
+    /// # Errors
+    /// Returns [`FormworkError::WetChoice`] if the slot contains an unconfirmed choice.
+    pub fn resolve_exact(self) -> Result<T, FormworkError> {
+        match self {
+            Slot::FixedWet(w) => Ok(w),
+            Slot::FixedDry(d) => Ok(d),
+            Slot::Choose(c) => c.resolve_exact(),
+        }
+    }
+
+    /// Alias for [`resolve_exact`](Self::resolve_exact).
+    pub fn resolve(self) -> Result<T, FormworkError> {
+        self.resolve_exact()
     }
 }

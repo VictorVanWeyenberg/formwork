@@ -1,0 +1,5 @@
+error: `#[slot(option)]` requires an `Option<T>` field type
+ --> tests/compile_fail/freeform_option_non_option.rs:6:16
+  |
+6 |     pub field: String,
+  |                ^^^^^^

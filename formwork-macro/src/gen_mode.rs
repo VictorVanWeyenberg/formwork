@@ -31,7 +31,15 @@ pub fn generate_modes(ast: &FormworkStruct, args: &FormworkArgs) -> TokenStream 
                     quote! {}
                 };
 
-                let slot_kind_desc = if config.pick {
+                let slot_kind_desc = if config.freeform {
+                    if config.collection {
+                        "ordered collection of freeform slot items"
+                    } else if config.option {
+                        "optional freeform slot item"
+                    } else {
+                        "freeform slot item"
+                    }
+                } else if config.pick {
                     "multi-item selection slot with cardinality constraints"
                 } else if config.collection {
                     "ordered collection of slot items"
@@ -59,18 +67,20 @@ pub fn generate_modes(ast: &FormworkStruct, args: &FormworkArgs) -> TokenStream 
                 let wet_inner_type = field.wet_inner_type(&config);
                 let dry_inner_type = field.dry_inner_type(&config);
 
-                if config.collection {
+                if config.freeform {
+                    if config.collection {
+                        wet_fields.push(quote! { type #mode_type_name = Vec<formwork::FreeformSlot<#wet_inner_type, #dry_inner_type>>; });
+                        dry_fields.push(quote! { type #mode_type_name = Vec<#dry_inner_type>; });
+                    } else {
+                        wet_fields.push(quote! { type #mode_type_name = formwork::FreeformSlot<#wet_inner_type, #dry_inner_type>; });
+                        dry_fields.push(quote! { type #mode_type_name = #dry_inner_type; });
+                    }
+                } else if config.collection {
                     wet_fields.push(quote! { type #mode_type_name = Vec<formwork::SingleSlot<#wet_inner_type, #dry_inner_type>>; });
-                    dry_fields
-                        .push(quote! { type #mode_type_name = Vec<#dry_inner_type>; });
+                    dry_fields.push(quote! { type #mode_type_name = Vec<#dry_inner_type>; });
                 } else if config.pick {
                     wet_fields.push(quote! { type #mode_type_name = formwork::MultiSlot<#wet_inner_type, #dry_inner_type>; });
-                    dry_fields
-                        .push(quote! { type #mode_type_name = Vec<#dry_inner_type>; });
-                } else if config.option {
-                    wet_fields.push(quote! { type #mode_type_name = formwork::SingleSlot<#wet_inner_type, #dry_inner_type>; });
-                    dry_fields
-                        .push(quote! { type #mode_type_name = #dry_inner_type; });
+                    dry_fields.push(quote! { type #mode_type_name = Vec<#dry_inner_type>; });
                 } else {
                     wet_fields.push(quote! { type #mode_type_name = formwork::SingleSlot<#wet_inner_type, #dry_inner_type>; });
                     dry_fields.push(quote! { type #mode_type_name = #dry_inner_type; });

@@ -100,12 +100,20 @@ fn process_field(
 }
 
 fn generate_local_step_dfs(field_name: &Ident, config: &SlotConfig) -> TokenStream {
+    let visit_call = if config.freeform {
+        quote! { visitor.visit_freeform(choice) }
+    } else if config.pick {
+        quote! { visitor.visit_multi(choice) }
+    } else {
+        quote! { visitor.visit_single(choice) }
+    };
+
     if config.collection {
         quote! {
             for slot in &mut self.#field_name {
                 if let formwork::Slot::Choose(choice) = slot {
                     if *current == target {
-                        return formwork::StepOutcome::Visited(visitor.visit_single(choice));
+                        return formwork::StepOutcome::Visited(#visit_call);
                     }
                     *current += 1;
                 }
@@ -115,17 +123,12 @@ fn generate_local_step_dfs(field_name: &Ident, config: &SlotConfig) -> TokenStre
         quote! {
             if let Some(formwork::Slot::Choose(choice)) = &mut self.#field_name {
                 if *current == target {
-                    return formwork::StepOutcome::Visited(visitor.visit_single(choice));
+                    return formwork::StepOutcome::Visited(#visit_call);
                 }
                 *current += 1;
             }
         }
     } else {
-        let visit_call = if config.pick {
-            quote! { visitor.visit_multi(choice) }
-        } else {
-            quote! { visitor.visit_single(choice) }
-        };
         quote! {
             if let formwork::Slot::Choose(choice) = &mut self.#field_name {
                 if *current == target {
@@ -178,12 +181,20 @@ fn generate_local_step_bfs(
     config: &SlotConfig,
     has_cascade: bool,
 ) -> TokenStream {
+    let visit_call = if config.freeform {
+        quote! { visitor.visit_freeform(choice) }
+    } else if config.pick {
+        quote! { visitor.visit_multi(choice) }
+    } else {
+        quote! { visitor.visit_single(choice) }
+    };
+
     if config.collection {
         quote! {
             for slot in &mut self.#field_name {
                 if let formwork::Slot::Choose(choice) = slot {
                     if *current == target {
-                        return (formwork::StepOutcome::Visited(visitor.visit_single(choice)), #has_cascade);
+                        return (formwork::StepOutcome::Visited(#visit_call), #has_cascade);
                     }
                     *current += 1;
                 }
@@ -193,17 +204,12 @@ fn generate_local_step_bfs(
         quote! {
             if let Some(formwork::Slot::Choose(choice)) = &mut self.#field_name {
                 if *current == target {
-                    return (formwork::StepOutcome::Visited(visitor.visit_single(choice)), #has_cascade);
+                    return (formwork::StepOutcome::Visited(#visit_call), #has_cascade);
                 }
                 *current += 1;
             }
         }
     } else {
-        let visit_call = if config.pick {
-            quote! { visitor.visit_multi(choice) }
-        } else {
-            quote! { visitor.visit_single(choice) }
-        };
         quote! {
             if let formwork::Slot::Choose(choice) = &mut self.#field_name {
                 if *current == target {

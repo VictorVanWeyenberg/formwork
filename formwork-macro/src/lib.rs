@@ -36,7 +36,10 @@ mod gen_visitor;
 /// - `#[slot(option)]`: Optional slot (`Option<T>`).
 /// - `#[slot(collection)]`: Ordered list of slot items (`Vec<T>`).
 /// - `#[slot(pick)]`: Multi-item selection slot with cardinality constraints (`Vec<T>`).
-/// - `cascade`: Add to any slot (e.g. `#[slot(cascade)]`, `#[slot(collection, cascade)]`)
+/// - `#[slot(freeform)]`: Freeform slot allowing arbitrary constructed values or defaults (`T` or `Freeform<T>`).
+/// - `#[slot(freeform, option)]`: Optional freeform slot (`Option<T>`).
+/// - `#[slot(freeform, collection)]`: Ordered collection of freeform slot items (`Vec<T>`).
+/// - `cascade`: Add to non-freeform slots (e.g. `#[slot(cascade)]`, `#[slot(collection, cascade)]`)
 ///   to recursively traverse and resolve nested child formworks.
 ///
 /// # Example

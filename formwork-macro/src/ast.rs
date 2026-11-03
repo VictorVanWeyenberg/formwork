@@ -40,6 +40,7 @@ pub struct SlotConfig {
     pub pick: bool,
     pub cascade: bool,
     pub option: bool,
+    pub freeform: bool,
 }
 
 impl FormworkStruct {
@@ -56,6 +57,7 @@ impl FormworkField {
             pick: false,
             cascade: false,
             option: false,
+            freeform: false,
         };
 
         for attr in &self.attrs {
@@ -71,6 +73,8 @@ impl FormworkField {
                             config.option = true;
                         } else if meta.path.is_ident("cascade") {
                             config.cascade = true;
+                        } else if meta.path.is_ident("freeform") {
+                            config.freeform = true;
                         } else {
                             return Err(meta.error("unsupported slot attribute argument"));
                         }
@@ -84,6 +88,18 @@ impl FormworkField {
         }
 
         if has_slot {
+            if config.freeform && config.pick {
+                return Err(darling::Error::custom(
+                    "`freeform` and `pick` cannot be used together in #[slot]",
+                )
+                .with_span(&self.ident));
+            }
+            if config.freeform && config.cascade {
+                return Err(darling::Error::custom(
+                    "`freeform` cannot be combined with `cascade` in #[slot]",
+                )
+                .with_span(&self.ident));
+            }
             if config.collection && config.pick {
                 return Err(darling::Error::custom(
                     "`collection` and `pick` cannot be used together in #[slot]",

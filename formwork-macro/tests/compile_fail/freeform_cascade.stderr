@@ -1,0 +1,5 @@
+error: `freeform` cannot be combined with `cascade` in #[slot]
+  --> tests/compile_fail/freeform_cascade.rs:12:9
+   |
+12 |     pub child: Child,
+   |         ^^^^^

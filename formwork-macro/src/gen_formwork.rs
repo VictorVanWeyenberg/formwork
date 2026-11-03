@@ -17,52 +17,70 @@ pub fn generate_formwork(ast: &FormworkStruct) -> TokenStream {
 
             if field.is_slot() {
                 let config = field.slot_config().unwrap().unwrap();
-                match (config.collection, config.pick, config.option, config.cascade) {
-                    (true, false, false, true) => {
-                        complete_checks
-                            .push(generate_cascade_collection_complete_check(field_name));
-                        resolve_fields
-                            .push(generate_cascade_collection_resolve_expression(field_name));
-                        from_fields.push(generate_general_collection_conversion(field_name));
-                    }
-                    (true, false, false, false) => {
+                if config.freeform {
+                    if config.collection {
                         complete_checks.push(generate_collection_complete_check(field_name));
-                        resolve_fields.push(generate_collection_resolve_expression(field_name));
-                        from_fields.push(generate_general_collection_conversion(field_name));
-                    }
-                    (false, true, false, true) => {
-                        complete_checks.push(generate_cascade_pick_complete_check(field_name));
-                        resolve_fields.push(generate_cascade_pick_resolve_expression(field_name));
-                        from_fields.push(generate_general_slot_conversion(field_name));
-                    }
-                    (false, true, false, false) => {
-                        complete_checks.push(generate_slot_complete_check(field_name));
-                        resolve_fields.push(generate_pick_resolve_expression(field_name));
-                        from_fields.push(generate_general_slot_conversion(field_name));
-                    }
-                    (false, false, true, true) => {
-                        complete_checks
-                            .push(generate_cascade_option_complete_check(field_name));
                         resolve_fields
-                            .push(generate_cascade_option_resolve_expression(field_name));
-                        from_fields.push(generate_option_slot_conversion(field_name));
-                    }
-                    (false, false, true, false) => {
+                            .push(generate_freeform_collection_resolve_expression(field_name));
+                        from_fields.push(generate_general_collection_conversion(field_name));
+                    } else if config.option {
                         complete_checks.push(generate_option_complete_check(field_name));
-                        resolve_fields.push(generate_option_resolve_expression(field_name));
+                        resolve_fields
+                            .push(generate_freeform_option_resolve_expression(field_name));
                         from_fields.push(generate_option_slot_conversion(field_name));
-                    }
-                    (false, false, false, true) => {
-                        complete_checks.push(generate_cascade_slot_complete_check(field_name));
-                        resolve_fields.push(generate_cascade_slot_resolve_expression(field_name));
-                        from_fields.push(generate_general_slot_conversion(field_name));
-                    }
-                    (false, false, false, false) => {
+                    } else {
                         complete_checks.push(generate_slot_complete_check(field_name));
                         resolve_fields.push(generate_slot_resolve_expression(field_name));
                         from_fields.push(generate_general_slot_conversion(field_name));
                     }
-                    _ => {}
+                } else {
+                    match (config.collection, config.pick, config.option, config.cascade) {
+                        (true, false, false, true) => {
+                            complete_checks
+                                .push(generate_cascade_collection_complete_check(field_name));
+                            resolve_fields
+                                .push(generate_cascade_collection_resolve_expression(field_name));
+                            from_fields.push(generate_general_collection_conversion(field_name));
+                        }
+                        (true, false, false, false) => {
+                            complete_checks.push(generate_collection_complete_check(field_name));
+                            resolve_fields.push(generate_collection_resolve_expression(field_name));
+                            from_fields.push(generate_general_collection_conversion(field_name));
+                        }
+                        (false, true, false, true) => {
+                            complete_checks.push(generate_cascade_pick_complete_check(field_name));
+                            resolve_fields.push(generate_cascade_pick_resolve_expression(field_name));
+                            from_fields.push(generate_general_slot_conversion(field_name));
+                        }
+                        (false, true, false, false) => {
+                            complete_checks.push(generate_slot_complete_check(field_name));
+                            resolve_fields.push(generate_pick_resolve_expression(field_name));
+                            from_fields.push(generate_general_slot_conversion(field_name));
+                        }
+                        (false, false, true, true) => {
+                            complete_checks
+                                .push(generate_cascade_option_complete_check(field_name));
+                            resolve_fields
+                                .push(generate_cascade_option_resolve_expression(field_name));
+                            from_fields.push(generate_option_slot_conversion(field_name));
+                        }
+                        (false, false, true, false) => {
+                            complete_checks.push(generate_option_complete_check(field_name));
+                            resolve_fields.push(generate_option_resolve_expression(field_name));
+                            from_fields.push(generate_option_slot_conversion(field_name));
+                        }
+                        (false, false, false, true) => {
+                            complete_checks.push(generate_cascade_slot_complete_check(field_name));
+                            resolve_fields.push(generate_cascade_slot_resolve_expression(field_name));
+                            from_fields.push(generate_general_slot_conversion(field_name));
+                        }
+                        (false, false, false, false) => {
+                            complete_checks.push(generate_slot_complete_check(field_name));
+                            resolve_fields.push(generate_slot_resolve_expression(field_name));
+                            from_fields.push(generate_general_slot_conversion(field_name));
+                        }
+                        _ => {}
+                    }
                 }
             } else {
                 resolve_fields.push(quote! { #field_name: self.#field_name });
@@ -209,6 +227,20 @@ fn generate_collection_resolve_expression(field_name: &Ident) -> TokenStream {
         #field_name: self.#field_name.into_iter()
             .map(formwork::SingleSlot::resolve_exact)
             .collect::<Result<Vec<_>, formwork::error::FormworkError>>()?
+    }
+}
+
+fn generate_freeform_collection_resolve_expression(field_name: &Ident) -> TokenStream {
+    quote! {
+        #field_name: self.#field_name.into_iter()
+            .map(formwork::FreeformSlot::resolve_exact)
+            .collect::<Result<Vec<_>, formwork::error::FormworkError>>()?
+    }
+}
+
+fn generate_freeform_option_resolve_expression(field_name: &Ident) -> TokenStream {
+    quote! {
+        #field_name: self.#field_name.map(formwork::FreeformSlot::resolve_exact).transpose()?
     }
 }
 
