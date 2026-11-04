@@ -46,6 +46,7 @@ impl<'a> SlotFieldContext<'a> {
         field: &'a FormworkField,
         config: &'a SlotConfig,
         struct_idents: &'a StructIdents<'a>,
+        builder_enabled: bool,
     ) -> Self {
         let field_name = field.ident.as_ref().unwrap();
         let camel_name = RenameRule::PascalCase.apply_to_field(field_name.to_string());
@@ -71,7 +72,7 @@ impl<'a> SlotFieldContext<'a> {
             quote! { formwork::choice::SingleChoice<#wet_inner_type> }
         };
 
-        let field_attrs = field.non_slot_attrs();
+        let field_attrs = field.non_slot_attrs(builder_enabled);
 
         Self {
             struct_idents,

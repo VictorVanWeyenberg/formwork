@@ -48,3 +48,38 @@ fn test_builders() {
         vec!["A".to_string(), "B".to_string()]
     );
 }
+
+#[formwork(builder)]
+struct EntityWithDefaults {
+    #[builder(default)]
+    optional_tag: Option<String>,
+    #[builder(default = 42)]
+    custom_number: i32,
+    #[slot]
+    name: String,
+}
+
+#[test]
+fn test_builder_with_field_defaults() {
+    // Both optional_tag and custom_number are omitted; they should take their defaults.
+    let wet_entity: EntityWithDefaultsFormwork = EntityWithDefaults::builder()
+        .name("hero".to_string())
+        .build();
+
+    let resolved = wet_entity.resolve().unwrap();
+    assert_eq!(resolved.optional_tag, None);
+    assert_eq!(resolved.custom_number, 42);
+    assert_eq!(resolved.name, "hero");
+
+    // Setting them explicitly should also work (and setter(into) should be preserved).
+    let wet_entity2: EntityWithDefaultsFormwork = EntityWithDefaults::builder()
+        .optional_tag("custom_tag".to_string())
+        .custom_number(100)
+        .name("villain".to_string())
+        .build();
+
+    let resolved2 = wet_entity2.resolve().unwrap();
+    assert_eq!(resolved2.optional_tag, Some("custom_tag".to_string()));
+    assert_eq!(resolved2.custom_number, 100);
+    assert_eq!(resolved2.name, "villain");
+}

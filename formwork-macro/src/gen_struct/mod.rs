@@ -87,7 +87,7 @@ fn generate_slot_field(
     idents: &StructIdents,
     args: &FormworkArgs,
 ) -> GeneratedField {
-    let ctx = SlotFieldContext::new(field, config, idents);
+    let ctx = SlotFieldContext::new(field, config, idents, args.builder);
     let slot_trait = generate_slot_trait(&ctx);
     let builder_attr = generate_slot_builder_attr(&ctx, args.builder);
     let mutator = if args.builder && config.collection {

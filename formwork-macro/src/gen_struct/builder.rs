@@ -139,7 +139,7 @@ pub(crate) fn generate_regular_field(
     args: &FormworkArgs,
 ) -> GeneratedField {
     let field_name = field.ident.as_ref().unwrap();
-    let field_attrs = field.non_slot_attrs();
+    let field_attrs = field.non_slot_attrs(args.builder);
     let doc_lines = extract_doc_comments(&field.attrs);
     let vis = &field.vis;
     let ty = &field.ty;

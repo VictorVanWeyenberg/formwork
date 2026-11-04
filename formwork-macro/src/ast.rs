@@ -27,7 +27,7 @@ pub struct FormworkStruct {
 }
 
 #[derive(Debug, FromField)]
-#[darling(forward_attrs(slot, allow, doc, cfg, serde, serde_as, deny, warn))]
+#[darling(forward_attrs(slot, allow, doc, cfg, serde, serde_as, deny, warn, builder))]
 pub struct FormworkField {
     pub ident: Option<Ident>,
     pub vis: syn::Visibility,
@@ -168,10 +168,18 @@ impl FormworkField {
         self.slot_config().unwrap_or(None).is_some()
     }
 
-    pub fn non_slot_attrs(&self) -> Vec<&Attribute> {
+    pub fn non_slot_attrs(&self, builder_enabled: bool) -> Vec<&Attribute> {
         self.attrs
             .iter()
-            .filter(|attr| !attr.path().is_ident("slot"))
+            .filter(|attr| {
+                if attr.path().is_ident("slot") {
+                    return false;
+                }
+                if !builder_enabled && attr.path().is_ident("builder") {
+                    return false;
+                }
+                true
+            })
             .collect()
     }
 
