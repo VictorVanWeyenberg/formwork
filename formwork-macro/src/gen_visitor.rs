@@ -18,7 +18,7 @@ struct VisitorParts {
 pub fn generate_visitor(ast: &FormworkStruct, args: &FormworkArgs) -> TokenStream {
     let name = &ast.ident;
     let wet_struct = format_ident!("{}Wet", name);
-    let is_dfs = args.traverse == TraversalStrategy::Dfs;
+    let is_dfs = args.traverse_strategy() == TraversalStrategy::Dfs;
     let parts = collect_visitor_parts(ast, is_dfs);
 
     if parts.visitor_bounds.is_empty() {

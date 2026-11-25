@@ -4,6 +4,7 @@ use quote::{format_ident, quote};
 
 pub fn generate_formwork(ast: &FormworkStruct) -> TokenStream {
     let name = &ast.ident;
+    let wet_struct = format_ident!("{}Wet", name);
     let dry_struct = format_ident!("{}Dry", name);
     let formwork_type = format_ident!("{}Formwork", name);
 
@@ -95,6 +96,9 @@ pub fn generate_formwork(ast: &FormworkStruct) -> TokenStream {
         quote! { #(#complete_checks)&&* }
     };
 
+    let self_cascade_impls =
+        crate::gen_convert::generate_self_cascade_impls(name, &wet_struct, &dry_struct);
+
     quote! {
         impl formwork::Formwork for #formwork_type {
             type Dry = #name<#dry_struct>;
@@ -117,6 +121,8 @@ pub fn generate_formwork(ast: &FormworkStruct) -> TokenStream {
                 }
             }
         }
+
+        #self_cascade_impls
     }
 }
 

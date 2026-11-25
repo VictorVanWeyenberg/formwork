@@ -29,7 +29,7 @@ pub(crate) fn generate_builder_derives(
     mode_trait: &Ident,
     mutators: &[TokenStream],
 ) -> TokenStream {
-    if !args.builder {
+    if !args.builder_enabled() {
         return quote! {};
     }
 
@@ -138,19 +138,20 @@ pub(crate) fn generate_regular_field(
     field: &FormworkField,
     args: &FormworkArgs,
 ) -> GeneratedField {
+    let builder_enabled = args.builder_enabled();
     let field_name = field.ident.as_ref().unwrap();
-    let field_attrs = field.non_slot_attrs(args.builder);
+    let field_attrs = field.non_slot_attrs(builder_enabled);
     let doc_lines = extract_doc_comments(&field.attrs);
     let vis = &field.vis;
     let ty = &field.ty;
 
     let (builder_attr, mutator) = if let Some(base_inner_type) = field.inner_type_if_vec() {
-        let builder_attr = if args.builder {
+        let builder_attr = if builder_enabled {
             quote! { #[builder(default, via_mutators)] }
         } else {
             quote! {}
         };
-        let mutator = if args.builder {
+        let mutator = if builder_enabled {
             let fn_name = format_ident!("with_{}", field_name);
             let doc = format_doc_comment(
                 &format!("Appends a single item to `{}`.", field_name),
@@ -168,7 +169,7 @@ pub(crate) fn generate_regular_field(
         };
         (builder_attr, mutator)
     } else {
-        let builder_attr = if args.builder {
+        let builder_attr = if builder_enabled {
             let doc_setter = if !doc_lines.is_empty() {
                 let doc = format_doc_comment(&format!("Sets `{}`.", field_name), &doc_lines, None);
                 quote! { doc = #doc, }

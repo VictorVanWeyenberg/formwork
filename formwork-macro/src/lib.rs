@@ -3,32 +3,34 @@
 //! Procedural macros for the Higher-Kinded Data (HKD) formwork architecture.
 //!
 //! Provides the primary [`#[formwork]`](macro@formwork) attribute macro to transform struct
-//! definitions into dual-mode Higher-Kinded Data structures.
+//! and enum definitions into dual-mode Higher-Kinded Data structures.
 
 use darling::{ast::NestedMeta, FromMeta};
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
 mod ast;
+mod gen_convert;
+mod gen_enum;
 mod gen_formwork;
 mod gen_mode;
 mod gen_struct;
 mod gen_visitor;
 
-/// Transforms a struct into a Higher-Kinded Data (HKD) formwork type.
+/// Transforms a struct or enum into a Higher-Kinded Data (HKD) formwork type.
 ///
 /// Generates a dual-mode type:
-/// - **Dry domain model (`StructName`)**: The watertight, cured domain struct with concrete field types.
-/// - **Wet formwork (`StructNameFormwork`)**: The mutable mold implementing `Formwork`,
-///   holding pending choices, defaults, and unconfirmed values in stateful slots.
+/// - **Dry domain model (`TypeName`)**: The watertight, cured domain struct or enum with concrete types.
+/// - **Wet formwork (`TypeNameFormwork`)**: The mutable mold implementing `Formwork`,
+///   holding pending choices, defaults, and unconfirmed values in stateful slots or nested formworks.
 ///
 /// # Macro Attributes
 ///
-/// - `builder`: Generates compile-time checked builders for both wet and dry types.
-/// - `traverse = "bfs" | "dfs"`: Choice traversal strategy for `.walk_choices()` (defaults to `"bfs"`).
+/// - `builder` *(structs only)*: Generates compile-time checked builders for both wet and dry types.
+/// - `traverse = "bfs" | "dfs"` *(structs only)*: Choice traversal strategy for `.walk_choices()` (defaults to `"bfs"`).
 /// - `derives(...)`: Additional derives forwarded to internal mode marker types.
 ///
-/// # Field Attributes
+/// # Struct Field Attributes
 ///
 /// Fields without attributes remain fixed in both modes. Slot fields use `#[slot(...)]`:
 ///
@@ -41,6 +43,14 @@ mod gen_visitor;
 /// - `#[slot(freeform, collection)]`: Ordered collection of freeform slot items (`Vec<T>`).
 /// - `cascade`: Add to non-freeform slots (e.g. `#[slot(cascade)]`, `#[slot(collection, cascade)]`)
 ///   to recursively traverse and resolve nested child formworks.
+///
+/// # Enums
+///
+/// `#[formwork]` also supports non-empty enums whose variants are exclusively single-field tuple
+/// variants wrapping distinct formwork types (e.g. `Variant(InnerFormworkType)`).
+/// Enum formworks transparently delegate `Formwork` and `Walkable` to their active variant, and
+/// generate `From` and builder slot-conversion implementations so inner variant types can be
+/// passed directly into parent `#[formwork(builder)]` methods.
 ///
 /// # Example
 ///
@@ -65,7 +75,7 @@ mod gen_visitor;
 /// ```
 #[proc_macro_attribute]
 pub fn formwork(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let item_struct = parse_macro_input!(item as DeriveInput);
+    let item_input = parse_macro_input!(item as DeriveInput);
 
     let attr_args = match NestedMeta::parse_meta_list(attr.into()) {
         Ok(v) => v,
@@ -77,7 +87,7 @@ pub fn formwork(attr: TokenStream, item: TokenStream) -> TokenStream {
         Err(e) => return TokenStream::from(e.write_errors()),
     };
 
-    for attr in &item_struct.attrs {
+    for attr in &item_input.attrs {
         if attr.path().is_ident("derive")
             && let Ok(meta) = attr.parse_args_with(
                 syn::punctuated::Punctuated::<syn::Path, syn::Token![,]>::parse_terminated,
@@ -96,35 +106,50 @@ pub fn formwork(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
-    let ast_struct = match ast::FormworkStruct::parse_input(&item_struct) {
-        Ok(ast) => ast,
-        Err(e) => return TokenStream::from(e.write_errors()),
-    };
+    match &item_input.data {
+        syn::Data::Struct(_) => {
+            let ast_struct = match ast::FormworkStruct::parse_input(&item_input) {
+                Ok(ast) => ast,
+                Err(e) => return TokenStream::from(e.write_errors()),
+            };
 
-    // Validate fields
-    if let darling::ast::Data::Struct(fields) = &ast_struct.data {
-        for field in &fields.fields {
-            if let Err(e) = field.slot_config() {
-                return TokenStream::from(e.write_errors());
+            if let darling::ast::Data::Struct(fields) = &ast_struct.data {
+                for field in &fields.fields {
+                    if let Err(e) = field.slot_config() {
+                        return TokenStream::from(e.write_errors());
+                    }
+                }
             }
+
+            let original_attrs = &item_input.attrs;
+
+            let modes = gen_mode::generate_modes(&ast_struct, &args);
+            let st = gen_struct::generate_struct(&ast_struct, original_attrs, &args);
+            let fw = gen_formwork::generate_formwork(&ast_struct);
+            let vis = gen_visitor::generate_visitor(&ast_struct, &args);
+
+            quote::quote! {
+                #modes
+                #st
+                #fw
+                #vis
+            }
+            .into()
         }
+        syn::Data::Enum(_) => {
+            let ast_enum = match ast::FormworkEnum::parse_input(&item_input, &args) {
+                Ok(ast) => ast,
+                Err(e) => return TokenStream::from(e.write_errors()),
+            };
+
+            gen_enum::generate_enum(&ast_enum, &item_input.attrs, &args).into()
+        }
+        syn::Data::Union(_) => TokenStream::from(
+            darling::Error::custom("`#[formwork]` only supports structs and enums, not unions")
+                .with_span(&item_input.ident)
+                .write_errors(),
+        ),
     }
-
-    let original_attrs = &item_struct.attrs;
-
-    let modes = gen_mode::generate_modes(&ast_struct, &args);
-    let st = gen_struct::generate_struct(&ast_struct, original_attrs, &args);
-    let fw = gen_formwork::generate_formwork(&ast_struct);
-    let vis = gen_visitor::generate_visitor(&ast_struct, &args);
-
-    let expanded = quote::quote! {
-        #modes
-        #st
-        #fw
-        #vis
-    };
-
-    expanded.into()
 }
 
 /// Internal helper attribute used by `#[formwork]` to qualify mode types for typed builders.

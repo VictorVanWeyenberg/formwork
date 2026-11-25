@@ -60,6 +60,7 @@
 
 /// Choice abstractions, state machines, and cardinality constraints.
 pub mod choice;
+mod convert;
 /// Error types returned during formwork choice manipulation and resolution.
 pub mod error;
 /// Traits and level structures defining formwork behavior and traversal.
@@ -77,3 +78,9 @@ pub use visitor::{AutoSelectFirst, ChoiceVisitor, ConfirmAll, UnmakeAll, Visitor
 
 /// Re-exported serde for downstream derive macros and bounds.
 pub use serde;
+
+#[doc(hidden)]
+#[allow(missing_docs)]
+pub mod __private {
+    pub use crate::convert::{CascadePickElement, IntoDryOption, IntoOptionSlot, IntoSlot};
+}

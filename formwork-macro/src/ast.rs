@@ -1,4 +1,6 @@
+use darling::util::SpannedValue;
 use darling::{FromDeriveInput, FromField, FromMeta};
+use std::collections::HashSet;
 use syn::{Attribute, DeriveInput, Ident, Meta, Type};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, FromMeta)]
@@ -12,11 +14,191 @@ pub enum TraversalStrategy {
 #[derive(Debug, FromMeta, Default)]
 pub struct FormworkArgs {
     #[darling(default)]
-    pub builder: bool,
+    pub builder: Option<SpannedValue<bool>>,
     #[darling(default)]
-    pub traverse: TraversalStrategy,
+    pub traverse: Option<SpannedValue<TraversalStrategy>>,
     #[darling(default)]
     pub derives: Vec<syn::Path>,
+}
+
+impl FormworkArgs {
+    pub fn builder_enabled(&self) -> bool {
+        self.builder.as_ref().is_some_and(|b| **b)
+    }
+
+    pub fn traverse_strategy(&self) -> TraversalStrategy {
+        self.traverse.as_ref().map(|t| **t).unwrap_or_default()
+    }
+}
+
+#[derive(Debug)]
+pub struct FormworkEnum {
+    pub vis: syn::Visibility,
+    pub ident: Ident,
+    pub variants: Vec<FormworkVariant>,
+}
+
+#[derive(Debug)]
+pub struct FormworkVariant {
+    pub ident: Ident,
+    pub attrs: Vec<Attribute>,
+    pub field_attrs: Vec<Attribute>,
+    pub inner_ty: Type,
+    pub discriminant: Option<(syn::token::Eq, syn::Expr)>,
+}
+
+impl FormworkEnum {
+    pub fn parse_input(item: &DeriveInput, args: &FormworkArgs) -> Result<Self, darling::Error> {
+        if let Some(builder) = &args.builder {
+            return Err(darling::Error::custom(
+                "`#[formwork(builder)]` is not supported on enums",
+            )
+            .with_span(&builder.span()));
+        }
+
+        if let Some(traverse) = &args.traverse {
+            return Err(darling::Error::custom(
+                "`#[formwork(traverse = \"...\")]` is not supported on enums; enums transparently delegate traversal to their active inner formwork",
+            )
+            .with_span(&traverse.span()));
+        }
+
+        if !item.generics.params.is_empty() {
+            return Err(darling::Error::custom(
+                "`#[formwork]` does not support generic parameters or lifetimes on enums",
+            )
+            .with_span(&item.generics));
+        }
+
+        if let Some(where_clause) = &item.generics.where_clause {
+            return Err(darling::Error::custom(
+                "`#[formwork]` does not support `where` clauses on enums",
+            )
+            .with_span(where_clause));
+        }
+
+        let syn::Data::Enum(data_enum) = &item.data else {
+            return Err(
+                darling::Error::custom("expected an enum").with_span(&item.ident)
+            );
+        };
+
+        if data_enum.variants.is_empty() {
+            return Err(
+                darling::Error::custom("`#[formwork]` does not support empty enums")
+                    .with_span(&item.ident),
+            );
+        }
+
+        let mut variants = Vec::with_capacity(data_enum.variants.len());
+        let mut seen_inner_types: HashSet<(bool, Vec<String>)> = HashSet::new();
+
+        for variant in &data_enum.variants {
+            if let Some(slot_attr) = variant.attrs.iter().find(|a| a.path().is_ident("slot")) {
+                return Err(darling::Error::custom(
+                    "`#[slot]` attributes are not allowed on enum variants",
+                )
+                .with_span(slot_attr));
+            }
+
+            for field in &variant.fields {
+                if let Some(slot_attr) = field.attrs.iter().find(|a| a.path().is_ident("slot")) {
+                    return Err(darling::Error::custom(
+                        "`#[slot]` attributes are not allowed on enum variant fields",
+                    )
+                    .with_span(slot_attr));
+                }
+            }
+
+            let field = match &variant.fields {
+                syn::Fields::Unit => {
+                    return Err(darling::Error::custom(
+                        "`#[formwork]` enums only support single-field tuple variants (e.g. `Variant(InnerType)`), not unit variants",
+                    )
+                    .with_span(&variant.ident));
+                }
+                syn::Fields::Named(named) => {
+                    return Err(darling::Error::custom(
+                        "`#[formwork]` enums only support single-field tuple variants (e.g. `Variant(InnerType)`), not struct variants",
+                    )
+                    .with_span(named));
+                }
+                syn::Fields::Unnamed(unnamed) => {
+                    if unnamed.unnamed.is_empty() {
+                        return Err(darling::Error::custom(
+                            "`#[formwork]` enums only support single-field tuple variants (e.g. `Variant(InnerType)`), not zero-field tuple variants",
+                        )
+                        .with_span(unnamed));
+                    }
+                    if unnamed.unnamed.len() > 1 {
+                        return Err(darling::Error::custom(
+                            "`#[formwork]` enums only support single-field tuple variants (e.g. `Variant(InnerType)`), not multi-field tuple variants",
+                        )
+                        .with_span(unnamed));
+                    }
+                    &unnamed.unnamed[0]
+                }
+            };
+
+            if !is_unparameterized_type_path(&field.ty) {
+                return Err(darling::Error::custom(
+                    "`#[formwork]` enum variant inner type must be an unparameterized type path referring to a formwork type",
+                )
+                .with_span(&field.ty));
+            }
+
+            if let Some(key) = normalized_type_path_key(&field.ty)
+                && !seen_inner_types.insert(key)
+            {
+                return Err(darling::Error::custom(
+                    "duplicate inner type in `#[formwork]` enum; each variant must wrap a distinct formwork type",
+                )
+                .with_span(&field.ty));
+            }
+
+            variants.push(FormworkVariant {
+                ident: variant.ident.clone(),
+                attrs: variant.attrs.clone(),
+                field_attrs: field.attrs.clone(),
+                inner_ty: field.ty.clone(),
+                discriminant: variant.discriminant.clone(),
+            });
+        }
+
+        Ok(Self {
+            vis: item.vis.clone(),
+            ident: item.ident.clone(),
+            variants,
+        })
+    }
+}
+
+pub fn is_unparameterized_type_path(ty: &syn::Type) -> bool {
+    let syn::Type::Path(type_path) = ty else {
+        return false;
+    };
+    type_path.qself.is_none()
+        && !type_path.path.segments.is_empty()
+        && type_path
+            .path
+            .segments
+            .iter()
+            .all(|seg| seg.arguments.is_empty())
+}
+
+fn normalized_type_path_key(ty: &syn::Type) -> Option<(bool, Vec<String>)> {
+    let syn::Type::Path(type_path) = ty else {
+        return None;
+    };
+    Some((
+        type_path.path.leading_colon.is_some(),
+        type_path
+            .path
+            .segments
+            .iter()
+            .map(|seg| seg.ident.to_string())
+            .collect(),
+    ))
 }
 
 #[derive(Debug, FromDeriveInput)]

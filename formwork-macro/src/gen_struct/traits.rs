@@ -54,33 +54,17 @@ fn generate_collection_slot_impl(
     elem_ty: &TokenStream,
     return_ty: &TokenStream,
     wrap: impl Fn(TokenStream) -> TokenStream,
-    generic_into: bool,
 ) -> TokenStream {
-    if generic_into {
-        let val_vec = wrap(quote! { self.into_iter().map(std::convert::Into::into).collect() });
-        let val_arr = wrap(quote! { self.into_iter().map(std::convert::Into::into).collect() });
-        quote! {
-            #[doc(hidden)]
-            impl<__V: std::convert::Into<#elem_ty>> #trait_name<#mode_struct> for Vec<__V> {
-                fn into_slot(self) -> #return_ty { #val_vec }
-            }
-            #[doc(hidden)]
-            impl<__V: std::convert::Into<#elem_ty>, const __N: usize> #trait_name<#mode_struct> for [__V; __N] {
-                fn into_slot(self) -> #return_ty { #val_arr }
-            }
+    let val_vec = wrap(quote! { self.into_iter().map(::std::convert::Into::into).collect() });
+    let val_arr = wrap(quote! { self.into_iter().map(::std::convert::Into::into).collect() });
+    quote! {
+        #[doc(hidden)]
+        impl<__V: ::std::convert::Into<#elem_ty>> #trait_name<#mode_struct> for Vec<__V> {
+            fn into_slot(self) -> #return_ty { #val_vec }
         }
-    } else {
-        let val_vec = wrap(quote! { self });
-        let val_arr = wrap(quote! { self.into_iter().collect() });
-        quote! {
-            #[doc(hidden)]
-            impl #trait_name<#mode_struct> for Vec<#elem_ty> {
-                fn into_slot(self) -> #return_ty { #val_vec }
-            }
-            #[doc(hidden)]
-            impl<const __N: usize> #trait_name<#mode_struct> for [#elem_ty; __N] {
-                fn into_slot(self) -> #return_ty { #val_arr }
-            }
+        #[doc(hidden)]
+        impl<__V: ::std::convert::Into<#elem_ty>, const __N: usize> #trait_name<#mode_struct> for [__V; __N] {
+            fn into_slot(self) -> #return_ty { #val_arr }
         }
     }
 }
@@ -107,29 +91,40 @@ fn generate_pick_slot_trait_impls(ctx: &SlotFieldContext) -> Vec<TokenStream> {
             #[doc(hidden)]
             impl #trait_name<#wet_struct> for #choice_type {
                 fn into_slot(self) -> #slot_type {
-                    formwork::Slot::Choose(self)
+                    ::formwork::Slot::Choose(self)
                 }
             }
         },
     ];
 
-    trait_impls.push(generate_collection_slot_impl(
-        trait_name,
-        wet_struct,
-        wet_inner_type,
-        slot_type,
-        |val| quote! { formwork::Slot::FixedWet(#val) },
-        !ctx.config.cascade,
-    ));
-
     if ctx.config.cascade {
+        trait_impls.push(quote! {
+            #[doc(hidden)]
+            impl<__V: ::formwork::__private::CascadePickElement<#wet_inner_type, #dry_inner_type>>
+                #trait_name<#wet_struct> for Vec<__V>
+            {
+                fn into_slot(self) -> #slot_type {
+                    ::formwork::__private::CascadePickElement::into_multi_slot(self)
+                }
+            }
+            #[doc(hidden)]
+            impl<
+                __V: ::formwork::__private::CascadePickElement<#wet_inner_type, #dry_inner_type>,
+                const __N: usize,
+            > #trait_name<#wet_struct> for [__V; __N]
+            {
+                fn into_slot(self) -> #slot_type {
+                    ::formwork::__private::CascadePickElement::into_multi_slot(self)
+                }
+            }
+        });
+    } else {
         trait_impls.push(generate_collection_slot_impl(
             trait_name,
             wet_struct,
-            dry_inner_type,
+            wet_inner_type,
             slot_type,
-            |val| quote! { formwork::Slot::FixedDry(#val) },
-            false,
+            |val| quote! { ::formwork::Slot::FixedWet(#val) },
         ));
     }
 
@@ -140,7 +135,6 @@ fn generate_pick_slot_trait_impls(ctx: &SlotFieldContext) -> Vec<TokenStream> {
         dry_inner_type,
         &return_ty_dry,
         |val| val,
-        !ctx.config.cascade,
     ));
 
     trait_impls
@@ -163,55 +157,26 @@ fn generate_standard_slot_trait_impls(ctx: &SlotFieldContext) -> Vec<TokenStream
         quote! { <#wet_struct as #mode_trait>::#mode_type_name }
     };
 
-    let mut trait_impls = vec![
+    vec![
         quote! {
             #[doc(hidden)]
-            impl #trait_name<#wet_struct> for #return_ty_wet {
+            impl<__V: ::formwork::__private::IntoSlot<#wet_inner_type, #dry_inner_type, #choice_type>>
+                #trait_name<#wet_struct> for __V
+            {
                 fn into_slot(self) -> #return_ty_wet {
-                    self
+                    ::formwork::__private::IntoSlot::into_slot(self)
                 }
             }
         },
         quote! {
             #[doc(hidden)]
-            impl #trait_name<#wet_struct> for #wet_inner_type {
-                fn into_slot(self) -> #return_ty_wet {
-                    formwork::Slot::FixedWet(self)
+            impl<__V: ::std::convert::Into<#dry_inner_type>> #trait_name<#dry_struct> for __V {
+                fn into_slot(self) -> #dry_inner_type {
+                    self.into()
                 }
             }
         },
-    ];
-
-    if ctx.config.cascade {
-        trait_impls.push(quote! {
-            #[doc(hidden)]
-            impl #trait_name<#wet_struct> for #dry_inner_type {
-                fn into_slot(self) -> #return_ty_wet {
-                    formwork::Slot::FixedDry(self)
-                }
-            }
-        });
-    }
-
-    trait_impls.push(quote! {
-        #[doc(hidden)]
-        impl #trait_name<#wet_struct> for #choice_type {
-            fn into_slot(self) -> #return_ty_wet {
-                formwork::Slot::Choose(self)
-            }
-        }
-    });
-
-    trait_impls.push(quote! {
-        #[doc(hidden)]
-        impl<__V: std::convert::Into<#dry_inner_type>> #trait_name<#dry_struct> for __V {
-            fn into_slot(self) -> #dry_inner_type {
-                self.into()
-            }
-        }
-    });
-
-    trait_impls
+    ]
 }
 
 fn generate_option_slot_trait_impls(ctx: &SlotFieldContext) -> Vec<TokenStream> {
@@ -226,93 +191,26 @@ fn generate_option_slot_trait_impls(ctx: &SlotFieldContext) -> Vec<TokenStream> 
     let opt_slot_ty = quote! { Option<#slot_type> };
     let opt_dry_ty = quote! { Option<#dry_inner_type> };
 
-    let mut trait_impls = vec![
+    vec![
         quote! {
             #[doc(hidden)]
-            impl #trait_name<#wet_struct> for #slot_type {
+            impl<__V: ::formwork::__private::IntoOptionSlot<#wet_inner_type, #dry_inner_type, #choice_type>>
+                #trait_name<#wet_struct> for __V
+            {
                 fn into_slot(self) -> #opt_slot_ty {
-                    Some(self)
+                    ::formwork::__private::IntoOptionSlot::into_option_slot(self)
                 }
             }
         },
         quote! {
             #[doc(hidden)]
-            impl #trait_name<#wet_struct> for #wet_inner_type {
-                fn into_slot(self) -> #opt_slot_ty {
-                    Some(formwork::Slot::FixedWet(self))
+            impl<__V: ::formwork::__private::IntoDryOption<#dry_inner_type>>
+                #trait_name<#dry_struct> for __V
+            {
+                fn into_slot(self) -> #opt_dry_ty {
+                    ::formwork::__private::IntoDryOption::into_dry_option(self)
                 }
             }
         },
-        quote! {
-            #[doc(hidden)]
-            impl #trait_name<#wet_struct> for #choice_type {
-                fn into_slot(self) -> #opt_slot_ty {
-                    Some(formwork::Slot::Choose(self))
-                }
-            }
-        },
-        quote! {
-            #[doc(hidden)]
-            impl #trait_name<#wet_struct> for #opt_slot_ty {
-                fn into_slot(self) -> #opt_slot_ty {
-                    self
-                }
-            }
-        },
-        quote! {
-            #[doc(hidden)]
-            impl #trait_name<#wet_struct> for Option<#wet_inner_type> {
-                fn into_slot(self) -> #opt_slot_ty {
-                    self.map(formwork::Slot::FixedWet)
-                }
-            }
-        },
-        quote! {
-            #[doc(hidden)]
-            impl #trait_name<#wet_struct> for Option<#choice_type> {
-                fn into_slot(self) -> #opt_slot_ty {
-                    self.map(formwork::Slot::Choose)
-                }
-            }
-        },
-    ];
-
-    if ctx.config.cascade {
-        trait_impls.push(quote! {
-            #[doc(hidden)]
-            impl #trait_name<#wet_struct> for #dry_inner_type {
-                fn into_slot(self) -> #opt_slot_ty {
-                    Some(formwork::Slot::FixedDry(self))
-                }
-            }
-        });
-        trait_impls.push(quote! {
-            #[doc(hidden)]
-            impl #trait_name<#wet_struct> for Option<#dry_inner_type> {
-                fn into_slot(self) -> #opt_slot_ty {
-                    self.map(formwork::Slot::FixedDry)
-                }
-            }
-        });
-    }
-
-    trait_impls.push(quote! {
-        #[doc(hidden)]
-        impl #trait_name<#dry_struct> for #dry_inner_type {
-            fn into_slot(self) -> #opt_dry_ty {
-                Some(self)
-            }
-        }
-    });
-
-    trait_impls.push(quote! {
-        #[doc(hidden)]
-        impl #trait_name<#dry_struct> for #opt_dry_ty {
-            fn into_slot(self) -> #opt_dry_ty {
-                self
-            }
-        }
-    });
-
-    trait_impls
+    ]
 }
