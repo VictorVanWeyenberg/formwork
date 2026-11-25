@@ -32,12 +32,11 @@ pub mod documented_enums {
     }
 
     /// A documented formwork enum with derives forwarding and a cfg-gated variant.
-    #[allow(clippy::non_minimal_cfg)]
     #[formwork(derives(Eq, Hash))]
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     pub enum FeatureEffect {
         /// Grants a proficiency.
-        #[cfg(all())]
+        #[cfg(test)]
         Proficiency(ProficiencyGrant),
         /// Grants an ability bonus.
         Bonus(AbilityBonus),

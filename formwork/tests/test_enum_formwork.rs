@@ -613,11 +613,10 @@ pub struct UnvisitedSlotInner {
     pub marker: CustomUnvisited,
 }
 
-#[allow(clippy::non_minimal_cfg)]
 #[formwork]
 #[derive(Clone, Debug, PartialEq)]
 pub enum CfgVariantEnum {
-    #[cfg(all())]
+    #[cfg(test)]
     Enabled(Proficiency),
     #[cfg(any())]
     DisabledExisting(AbilityBonus),

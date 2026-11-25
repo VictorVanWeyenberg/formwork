@@ -314,8 +314,14 @@ fn generate_enum_walkable(ast: &FormworkEnum, idents: &EnumIdents<'_>) -> TokenS
                 #name::#v_ident(inner) => ::formwork::Walkable::<__V>::unmake_step_level(inner, depth, target, current),
             });
         } else {
-            let cfg_active = quote! { #[cfg(all(#(#cfg_conds),*))] };
-            let cfg_inactive = quote! { #[cfg(not(all(#(#cfg_conds),*)))] };
+            let combined_cfg = if cfg_conds.len() == 1 {
+                let only = &cfg_conds[0];
+                quote! { #only }
+            } else {
+                quote! { all(#(#cfg_conds),*) }
+            };
+            let cfg_active = quote! { #[cfg(#combined_cfg)] };
+            let cfg_inactive = quote! { #[cfg(not(#combined_cfg))] };
             let helper_trait = format_ident!("__Formwork{}Walkable{}", name, v_ident);
 
             helper_items.push(quote! {
