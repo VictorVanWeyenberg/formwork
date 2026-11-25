@@ -139,7 +139,7 @@ pub fn formwork(attr: TokenStream, item: TokenStream) -> TokenStream {
         syn::Data::Enum(_) => {
             let ast_enum = match ast::FormworkEnum::parse_input(&item_input, &args) {
                 Ok(ast) => ast,
-                Err(e) => return TokenStream::from(e.write_errors()),
+                Err(e) => return TokenStream::from(e.to_compile_error()),
             };
 
             gen_enum::generate_enum(&ast_enum, &item_input.attrs, &args).into()

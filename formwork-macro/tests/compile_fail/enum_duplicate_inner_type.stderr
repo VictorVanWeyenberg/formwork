@@ -8,10 +8,10 @@ error: duplicate inner type in `#[formwork]` enum; each variant must wrap a dist
   --> tests/compile_fail/enum_duplicate_inner_type.rs:28:7
    |
 28 |     B(sub :: Inner),
-   |       ^^^
+   |       ^^^^^^^^^^^^
 
 error: duplicate inner type in `#[formwork]` enum; each variant must wrap a distinct formwork type
   --> tests/compile_fail/enum_duplicate_inner_type.rs:34:7
    |
 34 |     B(crate :: sub :: Inner),
-   |       ^^^^^
+   |       ^^^^^^^^^^^^^^^^^^^^^

@@ -8,7 +8,7 @@ error: `#[formwork]` enum variant inner type must be an unparameterized type pat
   --> tests/compile_fail/enum_invalid_inner_type.rs:16:7
    |
 16 |     A(&'static Inner),
-   |       ^
+   |       ^^^^^^^^^^^^^^
 
 error: `#[formwork]` enum variant inner type must be an unparameterized type path referring to a formwork type
   --> tests/compile_fail/enum_invalid_inner_type.rs:21:7
@@ -20,51 +20,51 @@ error: `#[formwork]` enum variant inner type must be an unparameterized type pat
   --> tests/compile_fail/enum_invalid_inner_type.rs:26:7
    |
 26 |     A(Option<Inner>),
-   |       ^^^^^^
+   |       ^^^^^^^^^^^^^
 
 error: `#[formwork]` enum variant inner type must be an unparameterized type path referring to a formwork type
   --> tests/compile_fail/enum_invalid_inner_type.rs:31:7
    |
 31 |     A(Vec<Inner>),
-   |       ^^^
+   |       ^^^^^^^^^^
 
 error: `#[formwork]` enum variant inner type must be an unparameterized type path referring to a formwork type
   --> tests/compile_fail/enum_invalid_inner_type.rs:36:7
    |
 36 |     A(Inner<InnerWet>),
-   |       ^^^^^
+   |       ^^^^^^^^^^^^^^^
 
 error: `#[formwork]` enum variant inner type must be an unparameterized type path referring to a formwork type
   --> tests/compile_fail/enum_invalid_inner_type.rs:41:7
    |
 41 |     A(mod_a::Foo<i32>::Bar),
-   |       ^^^^^
+   |       ^^^^^^^^^^^^^^^^^^^^
 
 error[E0107]: struct takes 0 generic arguments but 1 generic argument was supplied
-  --> tests/compile_fail/enum_invalid_inner_type.rs:46:7
+  --> tests/compile_fail/enum_invalid_inner_type.rs:48:7
    |
-44 |   #[formwork]
+46 |   #[formwork]
    |  ____________-
-45 | | pub enum NonFormworkStdInner {
-46 | |     A(String),
-   | |       ^^^^^-
-   | |_______|____|
-   |         |    help: remove the unnecessary generics
+47 | | pub enum NonFormworkInner {
+48 | |     A(NotAFormwork),
+   | |       ^^^^^^^^^^^-
+   | |_______|__________|
+   |         |          help: remove the unnecessary generics
    |         expected 0 generic arguments
    |
 note: struct defined here, with 0 generic parameters
-  --> $RUST/alloc/src/string.rs
+  --> tests/compile_fail/enum_invalid_inner_type.rs:44:12
    |
-   | pub struct String {
-   |            ^^^^^^
+44 | pub struct NotAFormwork;
+   |            ^^^^^^^^^^^^
 
-error[E0119]: conflicting implementations of trait `From<String>` for type `NonFormworkStdInner<NonFormworkStdInnerWet>`
-  --> tests/compile_fail/enum_invalid_inner_type.rs:44:1
+error[E0119]: conflicting implementations of trait `From<NotAFormwork>` for type `NonFormworkInner<NonFormworkInnerWet>`
+  --> tests/compile_fail/enum_invalid_inner_type.rs:46:1
    |
-44 | #[formwork]
+46 | #[formwork]
    | ^^^^^^^^^^^
    | |
    | first implementation here
-   | conflicting implementation for `NonFormworkStdInner<NonFormworkStdInnerWet>`
+   | conflicting implementation for `NonFormworkInner<NonFormworkInnerWet>`
    |
    = note: this error originates in the attribute macro `formwork` (in Nightly builds, run with -Z macro-backtrace for more info)

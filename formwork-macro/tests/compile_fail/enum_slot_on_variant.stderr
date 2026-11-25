@@ -2,10 +2,10 @@ error: `#[slot]` attributes are not allowed on enum variants
   --> tests/compile_fail/enum_slot_on_variant.rs:11:5
    |
 11 |     #[slot]
-   |     ^
+   |     ^^^^^^^
 
 error: `#[slot]` attributes are not allowed on enum variants
   --> tests/compile_fail/enum_slot_on_variant.rs:17:5
    |
 17 |     #[slot(cascade)]
-   |     ^
+   |     ^^^^^^^^^^^^^^^^

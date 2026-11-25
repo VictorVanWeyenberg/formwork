@@ -41,9 +41,11 @@ pub enum MidSegmentGenericInner {
     A(mod_a::Foo<i32>::Bar),
 }
 
+pub struct NotAFormwork;
+
 #[formwork]
-pub enum NonFormworkStdInner {
-    A(String),
+pub enum NonFormworkInner {
+    A(NotAFormwork),
 }
 
 fn main() {}

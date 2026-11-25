@@ -48,46 +48,44 @@ pub struct FormworkVariant {
 }
 
 impl FormworkEnum {
-    pub fn parse_input(item: &DeriveInput, args: &FormworkArgs) -> Result<Self, darling::Error> {
+    pub fn parse_input(item: &DeriveInput, args: &FormworkArgs) -> Result<Self, syn::Error> {
         if let Some(builder) = &args.builder {
-            return Err(darling::Error::custom(
+            return Err(syn::Error::new(
+                builder.span(),
                 "`#[formwork(builder)]` is not supported on enums",
-            )
-            .with_span(&builder.span()));
+            ));
         }
 
         if let Some(traverse) = &args.traverse {
-            return Err(darling::Error::custom(
+            return Err(syn::Error::new(
+                traverse.span(),
                 "`#[formwork(traverse = \"...\")]` is not supported on enums; enums transparently delegate traversal to their active inner formwork",
-            )
-            .with_span(&traverse.span()));
+            ));
         }
 
         if !item.generics.params.is_empty() {
-            return Err(darling::Error::custom(
+            return Err(syn::Error::new_spanned(
+                &item.generics,
                 "`#[formwork]` does not support generic parameters or lifetimes on enums",
-            )
-            .with_span(&item.generics));
+            ));
         }
 
         if let Some(where_clause) = &item.generics.where_clause {
-            return Err(darling::Error::custom(
+            return Err(syn::Error::new_spanned(
+                where_clause,
                 "`#[formwork]` does not support `where` clauses on enums",
-            )
-            .with_span(where_clause));
+            ));
         }
 
         let syn::Data::Enum(data_enum) = &item.data else {
-            return Err(
-                darling::Error::custom("expected an enum").with_span(&item.ident)
-            );
+            return Err(syn::Error::new_spanned(&item.ident, "expected an enum"));
         };
 
         if data_enum.variants.is_empty() {
-            return Err(
-                darling::Error::custom("`#[formwork]` does not support empty enums")
-                    .with_span(&item.ident),
-            );
+            return Err(syn::Error::new_spanned(
+                &item.ident,
+                "`#[formwork]` does not support empty enums",
+            ));
         }
 
         let mut variants = Vec::with_capacity(data_enum.variants.len());
@@ -95,65 +93,65 @@ impl FormworkEnum {
 
         for variant in &data_enum.variants {
             if let Some(slot_attr) = variant.attrs.iter().find(|a| a.path().is_ident("slot")) {
-                return Err(darling::Error::custom(
+                return Err(syn::Error::new_spanned(
+                    slot_attr,
                     "`#[slot]` attributes are not allowed on enum variants",
-                )
-                .with_span(slot_attr));
+                ));
             }
 
             for field in &variant.fields {
                 if let Some(slot_attr) = field.attrs.iter().find(|a| a.path().is_ident("slot")) {
-                    return Err(darling::Error::custom(
+                    return Err(syn::Error::new_spanned(
+                        slot_attr,
                         "`#[slot]` attributes are not allowed on enum variant fields",
-                    )
-                    .with_span(slot_attr));
+                    ));
                 }
             }
 
             let field = match &variant.fields {
                 syn::Fields::Unit => {
-                    return Err(darling::Error::custom(
+                    return Err(syn::Error::new_spanned(
+                        &variant.ident,
                         "`#[formwork]` enums only support single-field tuple variants (e.g. `Variant(InnerType)`), not unit variants",
-                    )
-                    .with_span(&variant.ident));
+                    ));
                 }
                 syn::Fields::Named(named) => {
-                    return Err(darling::Error::custom(
+                    return Err(syn::Error::new_spanned(
+                        named,
                         "`#[formwork]` enums only support single-field tuple variants (e.g. `Variant(InnerType)`), not struct variants",
-                    )
-                    .with_span(named));
+                    ));
                 }
                 syn::Fields::Unnamed(unnamed) => {
                     if unnamed.unnamed.is_empty() {
-                        return Err(darling::Error::custom(
+                        return Err(syn::Error::new_spanned(
+                            unnamed,
                             "`#[formwork]` enums only support single-field tuple variants (e.g. `Variant(InnerType)`), not zero-field tuple variants",
-                        )
-                        .with_span(unnamed));
+                        ));
                     }
                     if unnamed.unnamed.len() > 1 {
-                        return Err(darling::Error::custom(
+                        return Err(syn::Error::new_spanned(
+                            unnamed,
                             "`#[formwork]` enums only support single-field tuple variants (e.g. `Variant(InnerType)`), not multi-field tuple variants",
-                        )
-                        .with_span(unnamed));
+                        ));
                     }
                     &unnamed.unnamed[0]
                 }
             };
 
             if !is_unparameterized_type_path(&field.ty) {
-                return Err(darling::Error::custom(
+                return Err(syn::Error::new_spanned(
+                    &field.ty,
                     "`#[formwork]` enum variant inner type must be an unparameterized type path referring to a formwork type",
-                )
-                .with_span(&field.ty));
+                ));
             }
 
             if let Some(key) = normalized_type_path_key(&field.ty)
                 && !seen_inner_types.insert(key)
             {
-                return Err(darling::Error::custom(
+                return Err(syn::Error::new_spanned(
+                    &field.ty,
                     "duplicate inner type in `#[formwork]` enum; each variant must wrap a distinct formwork type",
-                )
-                .with_span(&field.ty));
+                ));
             }
 
             variants.push(FormworkVariant {
