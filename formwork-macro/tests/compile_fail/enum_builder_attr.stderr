@@ -1,0 +1,11 @@
+error: `#[formwork(builder)]` is not supported on enums
+ --> tests/compile_fail/enum_builder_attr.rs:9:12
+  |
+9 | #[formwork(builder)]
+  |            ^^^^^^^
+
+error: `#[formwork(builder)]` is not supported on enums
+  --> tests/compile_fail/enum_builder_attr.rs:14:22
+   |
+14 | #[formwork(builder = false)]
+   |                      ^^^^^

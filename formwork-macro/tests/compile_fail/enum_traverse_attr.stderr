@@ -1,0 +1,11 @@
+error: `#[formwork(traverse = "...")]` is not supported on enums; enums transparently delegate traversal to their active inner formwork
+ --> tests/compile_fail/enum_traverse_attr.rs:9:23
+  |
+9 | #[formwork(traverse = "bfs")]
+  |                       ^^^^^
+
+error: `#[formwork(traverse = "...")]` is not supported on enums; enums transparently delegate traversal to their active inner formwork
+  --> tests/compile_fail/enum_traverse_attr.rs:14:23
+   |
+14 | #[formwork(traverse = "dfs")]
+   |                       ^^^^^

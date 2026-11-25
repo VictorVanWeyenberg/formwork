@@ -1,0 +1,5 @@
+error: `#[formwork]` enums only support single-field tuple variants (e.g. `Variant(InnerType)`), not struct variants
+  --> tests/compile_fail/enum_struct_variant.rs:12:7
+   |
+12 |     B { inner: Inner },
+   |       ^^^^^^^^^^^^^^^^

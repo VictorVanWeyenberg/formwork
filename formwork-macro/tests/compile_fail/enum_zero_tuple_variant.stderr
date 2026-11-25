@@ -1,0 +1,5 @@
+error: `#[formwork]` enums only support single-field tuple variants (e.g. `Variant(InnerType)`), not zero-field tuple variants
+  --> tests/compile_fail/enum_zero_tuple_variant.rs:12:6
+   |
+12 |     B(),
+   |      ^^

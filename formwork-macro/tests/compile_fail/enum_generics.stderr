@@ -1,0 +1,23 @@
+error: `#[formwork]` does not support generic parameters or lifetimes on enums
+  --> tests/compile_fail/enum_generics.rs:10:21
+   |
+10 | pub enum GenericType<T> {
+   |                     ^
+
+error: `#[formwork]` does not support generic parameters or lifetimes on enums
+  --> tests/compile_fail/enum_generics.rs:15:25
+   |
+15 | pub enum GenericLifetime<'a> {
+   |                         ^
+
+error: `#[formwork]` does not support generic parameters or lifetimes on enums
+  --> tests/compile_fail/enum_generics.rs:20:22
+   |
+20 | pub enum GenericConst<const N: usize> {
+   |                      ^
+
+error: `#[formwork]` does not support `where` clauses on enums
+  --> tests/compile_fail/enum_generics.rs:26:1
+   |
+26 | where
+   | ^^^^^

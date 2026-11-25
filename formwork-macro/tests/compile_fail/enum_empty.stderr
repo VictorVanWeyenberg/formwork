@@ -1,0 +1,5 @@
+error: `#[formwork]` does not support empty enums
+ --> tests/compile_fail/enum_empty.rs:4:10
+  |
+4 | pub enum Empty {}
+  |          ^^^^^

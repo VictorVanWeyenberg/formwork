@@ -1,0 +1,5 @@
+error: `#[formwork]` enums only support single-field tuple variants (e.g. `Variant(InnerType)`), not multi-field tuple variants
+  --> tests/compile_fail/enum_multi_tuple_variant.rs:18:6
+   |
+18 |     B(InnerA, InnerB),
+   |      ^^^^^^^^^^^^^^^^
