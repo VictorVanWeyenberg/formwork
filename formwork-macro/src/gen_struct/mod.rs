@@ -31,8 +31,13 @@ pub fn generate_struct(
     let mut mutators = Vec::new();
     let mut slot_traits = Vec::new();
 
+    let mut has_slots = false;
+
     if let darling::ast::Data::Struct(fields) = &ast.data {
         for field in &fields.fields {
+            if field.is_slot() {
+                has_slots = true;
+            }
             let generated = generate_field(field, &idents, args);
             struct_fields.push(generated.field_tokens);
             if let Some(slot_trait) = generated.slot_trait {
@@ -42,6 +47,30 @@ pub fn generate_struct(
                 mutators.push(mutator);
             }
         }
+    }
+
+    if !has_slots {
+        let has_serde = args.derives.iter().any(|p| {
+            p.segments
+                .last()
+                .is_some_and(|s| s.ident == "Serialize" || s.ident == "Deserialize")
+        });
+        let serde_skip = if has_serde {
+            quote! { #[serde(skip)] }
+        } else {
+            quote! {}
+        };
+        let builder_skip = if args.builder_enabled() {
+            quote! { #[builder(default, setter(skip))] }
+        } else {
+            quote! {}
+        };
+        struct_fields.push(quote! {
+            #[doc(hidden)]
+            #serde_skip
+            #builder_skip
+            __formwork_mode: ::std::marker::PhantomData<M>,
+        });
     }
 
     let builder_derives = generate_builder_derives(args, &idents.mode_trait, &mutators);

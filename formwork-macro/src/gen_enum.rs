@@ -55,6 +55,18 @@ fn variant_cfg_attrs(variant: &FormworkVariant) -> Vec<&syn::Attribute> {
         .collect()
 }
 
+fn variant_cfg_conds(variant: &FormworkVariant) -> Vec<TokenStream> {
+    variant
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("cfg"))
+        .filter_map(|attr| match &attr.meta {
+            syn::Meta::List(list) => Some(list.tokens.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
 fn variant_mode_types(inner_ty: &syn::Type) -> (TokenStream, TokenStream) {
     let wet_mode = wet_mode_type(inner_ty).expect("validated unparameterized type path");
     let dry_mode = dry_mode_type(inner_ty).expect("validated unparameterized type path");
@@ -272,50 +284,146 @@ fn generate_enum_formwork(ast: &FormworkEnum, idents: &EnumIdents<'_>) -> TokenS
 
 fn generate_enum_walkable(ast: &FormworkEnum, idents: &EnumIdents<'_>) -> TokenStream {
     let name = idents.name;
+    let vis = idents.vis;
     let wet_struct = &idents.wet_struct;
 
-    let where_bounds = ast.variants.iter().map(|variant| {
+    let mut helper_items = Vec::new();
+    let mut where_bounds = Vec::with_capacity(ast.variants.len());
+    let mut walk_step_arms = Vec::with_capacity(ast.variants.len());
+    let mut unmake_arms = Vec::with_capacity(ast.variants.len());
+    let mut walk_level_arms = Vec::with_capacity(ast.variants.len());
+    let mut unmake_level_arms = Vec::with_capacity(ast.variants.len());
+
+    for variant in &ast.variants {
+        let v_ident = &variant.ident;
         let (inner_wet, _) = variant_mode_types(&variant.inner_ty);
-        quote! { #inner_wet: ::formwork::Walkable<__V> }
-    });
+        let cfg_conds = variant_cfg_conds(variant);
 
-    let walk_step_arms = ast.variants.iter().map(|variant| {
-        let v_ident = &variant.ident;
-        let cfg_attrs = variant_cfg_attrs(variant);
-        quote! {
-            #(#cfg_attrs)*
-            #name::#v_ident(inner) => ::formwork::Walkable::<__V>::walk_step(inner, visitor, target, current),
-        }
-    });
+        if cfg_conds.is_empty() {
+            where_bounds.push(quote! { #inner_wet: ::formwork::Walkable<__V> });
+            walk_step_arms.push(quote! {
+                #name::#v_ident(inner) => ::formwork::Walkable::<__V>::walk_step(inner, visitor, target, current),
+            });
+            unmake_arms.push(quote! {
+                #name::#v_ident(inner) => ::formwork::Walkable::<__V>::unmake_at_index(inner, target, current),
+            });
+            walk_level_arms.push(quote! {
+                #name::#v_ident(inner) => ::formwork::Walkable::<__V>::walk_step_level(inner, visitor, depth, target, current),
+            });
+            unmake_level_arms.push(quote! {
+                #name::#v_ident(inner) => ::formwork::Walkable::<__V>::unmake_step_level(inner, depth, target, current),
+            });
+        } else {
+            let cfg_active = quote! { #[cfg(all(#(#cfg_conds),*))] };
+            let cfg_inactive = quote! { #[cfg(not(all(#(#cfg_conds),*)))] };
+            let helper_trait = format_ident!("__Formwork{}Walkable{}", name, v_ident);
 
-    let unmake_arms = ast.variants.iter().map(|variant| {
-        let v_ident = &variant.ident;
-        let cfg_attrs = variant_cfg_attrs(variant);
-        quote! {
-            #(#cfg_attrs)*
-            #name::#v_ident(inner) => ::formwork::Walkable::<__V>::unmake_at_index(inner, target, current),
-        }
-    });
+            helper_items.push(quote! {
+                #[doc(hidden)]
+                #[allow(missing_docs, non_camel_case_types)]
+                #vis trait #helper_trait<__V> {
+                    #cfg_active
+                    fn walk_step(
+                        inner: &mut #inner_wet,
+                        visitor: &mut __V,
+                        target: usize,
+                        current: &mut usize,
+                    ) -> ::formwork::StepOutcome;
 
-    let walk_level_arms = ast.variants.iter().map(|variant| {
-        let v_ident = &variant.ident;
-        let cfg_attrs = variant_cfg_attrs(variant);
-        quote! {
-            #(#cfg_attrs)*
-            #name::#v_ident(inner) => ::formwork::Walkable::<__V>::walk_step_level(inner, visitor, depth, target, current),
-        }
-    });
+                    #cfg_active
+                    fn unmake_at_index(
+                        inner: &mut #inner_wet,
+                        target: usize,
+                        current: &mut usize,
+                    ) -> bool;
 
-    let unmake_level_arms = ast.variants.iter().map(|variant| {
-        let v_ident = &variant.ident;
-        let cfg_attrs = variant_cfg_attrs(variant);
-        quote! {
-            #(#cfg_attrs)*
-            #name::#v_ident(inner) => ::formwork::Walkable::<__V>::unmake_step_level(inner, depth, target, current),
+                    #cfg_active
+                    fn walk_step_level(
+                        inner: &mut #inner_wet,
+                        visitor: &mut __V,
+                        depth: usize,
+                        target: usize,
+                        current: &mut usize,
+                    ) -> (::formwork::StepOutcome, bool);
+
+                    #cfg_active
+                    fn unmake_step_level(
+                        inner: &mut #inner_wet,
+                        depth: usize,
+                        target: usize,
+                        current: &mut usize,
+                    ) -> (bool, bool);
+                }
+
+                #cfg_active
+                impl<__V> #helper_trait<__V> for #wet_struct
+                where
+                    #inner_wet: ::formwork::Walkable<__V>,
+                {
+                    fn walk_step(
+                        inner: &mut #inner_wet,
+                        visitor: &mut __V,
+                        target: usize,
+                        current: &mut usize,
+                    ) -> ::formwork::StepOutcome {
+                        ::formwork::Walkable::<__V>::walk_step(inner, visitor, target, current)
+                    }
+
+                    fn unmake_at_index(
+                        inner: &mut #inner_wet,
+                        target: usize,
+                        current: &mut usize,
+                    ) -> bool {
+                        ::formwork::Walkable::<__V>::unmake_at_index(inner, target, current)
+                    }
+
+                    fn walk_step_level(
+                        inner: &mut #inner_wet,
+                        visitor: &mut __V,
+                        depth: usize,
+                        target: usize,
+                        current: &mut usize,
+                    ) -> (::formwork::StepOutcome, bool) {
+                        ::formwork::Walkable::<__V>::walk_step_level(inner, visitor, depth, target, current)
+                    }
+
+                    fn unmake_step_level(
+                        inner: &mut #inner_wet,
+                        depth: usize,
+                        target: usize,
+                        current: &mut usize,
+                    ) -> (bool, bool) {
+                        ::formwork::Walkable::<__V>::unmake_step_level(inner, depth, target, current)
+                    }
+                }
+
+                #cfg_inactive
+                impl<__V> #helper_trait<__V> for #wet_struct {}
+            });
+
+            where_bounds.push(quote! { #wet_struct: #helper_trait<__V> });
+            walk_step_arms.push(quote! {
+                #cfg_active
+                #name::#v_ident(inner) => <#wet_struct as #helper_trait<__V>>::walk_step(inner, visitor, target, current),
+            });
+            unmake_arms.push(quote! {
+                #cfg_active
+                #name::#v_ident(inner) => <#wet_struct as #helper_trait<__V>>::unmake_at_index(inner, target, current),
+            });
+            walk_level_arms.push(quote! {
+                #cfg_active
+                #name::#v_ident(inner) => <#wet_struct as #helper_trait<__V>>::walk_step_level(inner, visitor, depth, target, current),
+            });
+            unmake_level_arms.push(quote! {
+                #cfg_active
+                #name::#v_ident(inner) => <#wet_struct as #helper_trait<__V>>::unmake_step_level(inner, depth, target, current),
+            });
         }
-    });
+    }
 
     quote! {
+        #(#helper_items)*
+
         impl<__V> ::formwork::Walkable<__V> for #name<#wet_struct>
         where
             #(#where_bounds),*

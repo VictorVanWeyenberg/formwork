@@ -12,11 +12,14 @@ pub fn generate_formwork(ast: &FormworkStruct) -> TokenStream {
     let mut resolve_fields = Vec::new();
     let mut from_fields = Vec::new();
 
+    let mut has_slots = false;
+
     if let darling::ast::Data::Struct(fields) = &ast.data {
         for field in &fields.fields {
             let field_name = field.ident.as_ref().unwrap();
 
             if field.is_slot() {
+                has_slots = true;
                 let config = field.slot_config().unwrap().unwrap();
                 if config.freeform {
                     if config.collection {
@@ -88,6 +91,11 @@ pub fn generate_formwork(ast: &FormworkStruct) -> TokenStream {
                 from_fields.push(quote! { #field_name: value.#field_name });
             }
         }
+    }
+
+    if !has_slots {
+        resolve_fields.push(quote! { __formwork_mode: ::std::marker::PhantomData });
+        from_fields.push(quote! { __formwork_mode: ::std::marker::PhantomData });
     }
 
     let is_complete_body = if complete_checks.is_empty() {
